@@ -1,4 +1,11 @@
-# PACT - Protein Analysis and Classifier Toolkit
+# PACT - Protein Analysis and Classifier Toolkit<br />
+
+Each release will be archived into a year.month directory<br/>
+This software is released under GNU General Public License 3<br/>
+Additional license options available at http://license.umn.edu<br/>
+
+Release History:<br/>
+Version 2018.6 - Initial Release<br/>
 
 # Main Protocols:<br />
 back_to_consensus<br />
@@ -15,3 +22,6 @@ tools<br />
 # Experimental Protocols:<br />
 epitope_mapping<br />
 enzyme_solubility<br />
+
+# Mini PACT:<br />
+This is for those just interested in the fitness protocol and none of the other protocols.
