@@ -18,7 +18,7 @@ sequence_homology<br />
 shannon_entropy<br />
 structure_analysis<br />
 tools<br />
-<br />
+
 # Experimental Protocols:<br />
 epitope_mapping<br />
 enzyme_solubility<br />
