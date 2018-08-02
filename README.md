@@ -1,6 +1,6 @@
 # PACT - Protein Analysis and Classifier Toolkit
 
-Main Protocols:<br />
+# Main Protocols:<br />
 back_to_consensus<br />
 classification_analysis<br />
 enzyme_filter<br />
@@ -12,6 +12,6 @@ shannon_entropy<br />
 structure_analysis<br />
 tools<br />
 <br />
-Experimental Protocols:<br />
+# Experimental Protocols:<br />
 epitope_mapping<br />
 enzyme_solubility<br />
