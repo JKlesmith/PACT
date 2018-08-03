@@ -3,6 +3,11 @@
 Each release will be archived into a year.month directory<br/>
 This software is released under GNU General Public License 3<br/>
 Additional license options available at http://license.umn.edu<br/>
+Contact: Justin R. Klesmith at: jrk [ampersand symbol] umn.edu<br/>
+Please Cite:<br/>
+https://github.com/JKlesmith/PACT/<br/>
+Publication Pending<br/>
+
 
 Release History:<br/>
 Version 2018.6 - Initial Release<br/>
