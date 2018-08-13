@@ -10,7 +10,7 @@ https://github.com/JKlesmith/PACT/<br/>
 Justin R. Klesmith and Benjamin J. Hackel, Development of an in silico enzyme stability filter via PACT: Protein Analysis and Classifier Toolkit, In Preparation.<br/>
 
 # Usage:<br />
-python pact.py -c ./path/to/config/file.ini
+python pact.py -c ./path/to/config_file.ini
 
 # Main Protocols:<br />
 back_to_consensus<br />
