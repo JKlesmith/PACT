@@ -7,7 +7,7 @@ Additional license options available at http://license.umn.edu<br/>
 Contact: Justin R. Klesmith at: jrk [ampersand symbol] umn.edu<br/>
 Please Cite:<br/>
 https://github.com/JKlesmith/PACT/<br/>
-Publication Pending<br/>
+Justin R. Klesmith, and Benjamin J. Hackel, Development of an in silico enzyme stability filter via PACT: Protein Analysis and Classifier Toolkit, In Preparation.<br/>
 
 
 Release History:<br/>
