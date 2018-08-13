@@ -13,6 +13,9 @@ Justin R. Klesmith, and Benjamin J. Hackel, Development of an in silico enzyme s
 Release History:<br/>
 Version 2018.6 - Initial Release<br/>
 
+# Usage:<br />
+python pact.py -c ./path/to/config/file.ini
+
 # Main Protocols:<br />
 back_to_consensus<br />
 classification_analysis<br />
@@ -29,5 +32,3 @@ tools<br />
 epitope_mapping<br />
 enzyme_solubility<br />
 
-# Mini PACT:<br />
-This is for those just interested in the fitness protocol and none of the other protocols.
