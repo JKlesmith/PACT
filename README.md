@@ -5,13 +5,9 @@ This software is released under GNU General Public License 3<br/>
 Additional license options available at http://license.umn.edu<br/>
 
 Contact: Justin R. Klesmith at: jrk [at] umn.edu<br/>
-Please Cite:<br/>
+# Citation:<br/>
 https://github.com/JKlesmith/PACT/<br/>
 Justin R. Klesmith, and Benjamin J. Hackel, Development of an in silico enzyme stability filter via PACT: Protein Analysis and Classifier Toolkit, In Preparation.<br/>
-
-
-Release History:<br/>
-Version 2018.6 - Initial Release<br/>
 
 # Usage:<br />
 python pact.py -c ./path/to/config/file.ini
@@ -32,3 +28,5 @@ tools<br />
 epitope_mapping<br />
 enzyme_solubility<br />
 
+# Release History:<br/>
+Version 2018.6 - Initial Release<br/>
