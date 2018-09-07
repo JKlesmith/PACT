@@ -330,21 +330,18 @@ class multiple_freq_mi:
                     list_freq2.append(nparr_single_freq2[np.where(nparr_single_freq2[:,0] == combo[1])][0][1])
 
                 #Add to our lists
-                #Replace with a numpy solution in the future
-                for i in range(0, nparr_dbl_combos.shape[0]):
-                    list_combinations.append([
-                        mapping[0],
-                        mapping[1],
-                        nparr_dbl_combos[i][0],
-                        nparr_dbl_combos[i][1],
-                        list_freq1[i],
-                        list_freq2[i],
-                        nparr_dbl_counts.reshape((nparr_dbl_combos.shape[0], 1))[i][0],
-                        dict_nparray_sel[design_key].shape[0]
-                        ])
+                list_combinations.append(np.hstack((
+                    np.full((nparr_dbl_combos.shape[0], 1), mapping[0]), #Site 1
+                    np.full((nparr_dbl_combos.shape[0], 1), mapping[1]), #Site 2
+                    nparr_dbl_combos, #Aminos
+                    np.array(list_freq1).reshape((nparr_dbl_combos.shape[0], 1)), #Site 1 Freq
+                    np.array(list_freq2).reshape((nparr_dbl_combos.shape[0], 1)), #Site 2 Freq
+                    nparr_dbl_counts.reshape((nparr_dbl_combos.shape[0], 1)), #Counts of pairing
+                    np.full((nparr_dbl_combos.shape[0], 1), dict_nparray_sel[design_key].shape[0]) #Total read counts
+                    )).tolist())
 
             #Convert to numpy array
-            nparr_combinations = np.array(list_combinations)  
+            nparr_combinations = np.array(list_combinations[0])  
 
             #Extract the frequency and counts, reshape to 2D, and type
             freq_one = np.asarray(nparr_combinations.T[4].reshape((nparr_combinations.shape[0], 1))).astype(float)
