@@ -18,26 +18,37 @@
 
 """contact_number - Calculate the number of Ca/b atoms in a sphere around a Ca/b atom"""
 
-from sys import version_info
+#Set the name of this module
+module_name = "Contact Number"
 
 #Check to see if our version is supported
-req_version = (3,4)
-cur_version = version_info
-
-if cur_version < req_version:
-    print("[Contact Number Error] Your Python interpreter is too old."
+from sys import version_info
+if version_info < (3,4):
+    print("[" + module_name + " Error] Your Python interpreter is too old."
           "Minimium version required is Python 3.4 (64 bit recommended).")
     quit()
 
+from collections import Counter
 from configparser import NoOptionError
-from math import sqrt, pow
-from pact.pact_common import pretty_counter_dicts, euc_dist
+from pact.pact_common import pretty_counter_dicts
+
+try:
+    import numpy as np
+except ImportError:
+    print("[Error] Numpy is not installed and is required.")
+    quit()
+
+try:
+    from scipy.spatial.distance import cdist
+except ImportError:
+    print("[Error] SciPy is not installed and is required.")
+    quit()
 
 #Set the author information
 __author__ = "Justin R. Klesmith"
 __copyright__ = "Copyright 2018, Justin R. Klesmith"
 __license__ = "GPL-3.0"
-__version__ = "2018.6"
+__version__ = "2018.12"
 __maintainer__ = "Justin R. Klesmith"
 __email__ = ["jrk@umn.edu", "hackel@umn.edu"]
 
@@ -58,119 +69,117 @@ class contact_number:
 
         #Get any config file entries
         if self.config_file.has_section("contact_number"):
+
+            #Using config file
+            print("[Contact Number] Using config file options")
+            self.config_file_check = False
+
             try:
-                #Classifier specific variables
+                #Set the pdb file name to look for in the pdb file dict
                 self.pdb_file = self.config_file.get('contact_number', 'pdb_file')
-                self.config_atoms = self.config_file.get('contact_number', 'atoms')
-                self.config_chains = self.config_file.get('contact_number', 'chains')
-                self.report_chain = self.config_file.get('contact_number', 'report_chain')
-                self.config_distance = self.config_file.get('contact_number', 'distance')
+
+                #Select which atoms to base our calculation off of
+                self.atom = self.config_file.get('contact_number', 'atom').upper()
+
+                #Select which chains to calculate for
+                self.chains = [chain.strip(' ') for chain in
+                               self.config_file.get('contact_number', 'chains').upper().split(',')]
+
+                #Define the distance shell for neighbors
+                self.distance = float(self.config_file.get('contact_number', 'distance'))
+
+                #Select the chain to count our classifiers on
+                self.classifer_chain = self.config_file.get('contact_number', 'classifer_chain').upper()
+
             except NoOptionError:
-                print("[Contact Number Error] the config file is missing any of the options: pdb_file, atoms, chains, or distance.")
-                self.config_atoms = "CA"
-                self.config_chains = "A"
-                self.config_distance = 10
-                self.report_chain = "A"
+                print("[Contact Number Warning] The config file is missing some options")
         else:
-            print("[Contact Number Error] the config file is missing the section [contact_number]")
+            print("[Contact Number] Not using config file options")
+            self.config_file_check = True
 
         return
 
-    def contact_number(self, dict_pdb, key_pdb='', atom_include='', distance='', chain_include=''):
-        """Calculate the contact number of a residue"""
+    def manual_config(self, dict_configopts):
+        """Set manual config options"""
 
-        #Use the config file or the function call
-        if len(atom_include) > 0:
-            list_atoms = atom_include.upper().split(',')
-        else:
-            list_atoms = self.config_atoms.upper().split(',')
+        #Set the pdb file name to look for in the pdb file dict
+        self.pdb_file = dict_configopts['pdb_file']
 
-        if len(chain_include) > 0:
-            list_chains = chain_include.upper().split(',')
-        else:
-            list_chains = self.config_chains.upper().split(',')
+        #Select the atom to base our calculation off of
+        self.atom = dict_configopts['atom'].upper()
 
-        if len(distance) > 0:
-            shell_dist = float(distance)
-        else:
-            shell_dist = float(self.config_distance)
+        #Select which chains to calculate for
+        self.chains = [chain.strip(' ') for chain in dict_configopts['chains'].upper().split(',')]
 
-        if len(key_pdb) > 0:
-            pdb_filename = key_pdb
-        else:
-            pdb_filename = self.pdb_file
+        #Define the distance shell for neighbors
+        self.distance = float(dict_configopts['distance'])
 
+        #Select the chain to count our classifiers on
+        self.classifer_chain = dict_configopts['classifier_chain'].upper()
+
+        return
+
+    def contact_coords(self, dict_pdb):
+        """Return a list of contact coords"""                 
 
         #Create a list of xyz coords that we want to match to (i.e. flatten the pdb dict)
-        list_coords = []
+        return list([atom['x_coor'], atom['y_coor'], atom['z_coor']]
+                           for chain in self.chains
+                           for resi_num in dict_pdb[self.pdb_file]['dict_atom'][chain]
+                           for atom in dict_pdb[self.pdb_file]['dict_atom'][chain][resi_num]
+                           if atom['atom_name'] == self.atom)
 
-        #Loop our chains
-        for chain in list_chains:
+    def contact_number(self, dict_pdb, dict_configopts = None):
+        """Calculate the contact number of a residue"""
 
-            #The dict pdb[atom][chain][resi_num] is a list of dicts
-            #Only select the atoms and chains we actually want
-            for resi_num in dict_pdb[pdb_filename]['dict_atom'][chain]:
+        #Set manual config options
+        if dict_configopts != None:
+            self.manual_config(dict_configopts)
+        elif self.config_file_check and dict_configopts == None:
+            print("[" + module_name + " Error] The config file or manual config is missing")
+            quit()
 
-                #Loop the resi_nums
-                for atom in dict_pdb[pdb_filename]['dict_atom'][chain][resi_num]:
-
-                    #Skip atoms we do not want
-                    if atom['atom_name'] not in list_atoms:
-                        continue
-
-                    #Else append the x,y,z as a list of lists
-                    list_coords.append([atom['x_coor'], atom['y_coor'], atom['z_coor']])
+        #Return the list of potential contact coords
+        nparr_contact_coords = np.array(self.contact_coords(dict_pdb))
 
         #Create a dict to work into
         dict_contact = {}
 
         #Loop our chains
-        for chain in list_chains:
+        for chain in self.chains:
 
             #Check if chain exists in our output dict
             if chain not in dict_contact:
                 dict_contact[chain] = {}
 
             #Loop our dict_pdb
-            for resi_num in dict_pdb[pdb_filename]['dict_atom'][chain]:
-
-                #Add the residue to the dict
-                if resi_num not in dict_contact[chain]:
-                    dict_contact[chain][resi_num] = []
+            for resi_num in dict_pdb[self.pdb_file]['dict_atom'][chain]:
 
                 #Loop each search residue
-                for atom in dict_pdb[pdb_filename]['dict_atom'][chain][resi_num]:
+                nparr_atm_coord = np.array([[atom['x_coor'], atom['y_coor'], atom['z_coor']]
+                                  for atom in dict_pdb[self.pdb_file]['dict_atom'][chain][resi_num]
+                                  if atom['atom_name'] == self.atom])
 
-                    #Exclude if not in our list
-                    if atom['atom_name'] not in list_atoms:
-                        continue
+                #Calculate the euc dist
+                resi_dists = cdist(nparr_atm_coord, nparr_contact_coords, metric='euclidean')
 
-                    #Search each residue
-                    for search_atm in list_coords:
-                        
-                        #Exclude if the same
-                        if (search_atm[0] == atom['x_coor'] and
-                            search_atm[1] == atom['y_coor'] and
-                            search_atm[2] == atom['z_coor']):
-                            continue
-
-                        #Calculate the Euclidean distance
-                        dist = euc_dist(atom['x_coor'], search_atm[0],
-                                        atom['y_coor'], search_atm[1],
-                                        atom['z_coor'], search_atm[2])
-
-                        #Append to our return dict if dist is below our threshold
-                        if dist <= shell_dist:
-                            dict_contact[chain][resi_num].append(dist)
+                #Find the number of elements that are less than our shell dist, then subtract 1 for itself
+                dict_contact[chain][resi_num] = np.count_nonzero(resi_dists <= self.distance) - 1                                    
 
         return dict_contact
 
-    def classified_count(self, dict_contact, dict_classified):
+    def classified_count(self, dict_contact, dict_classified, dict_configopts = None):
         """Count our classifiers"""
 
-        #Import our counter
-        from collections import Counter
+        #Set manual config options
+        if dict_configopts != None:
+            self.manual_config(dict_configopts)
+        elif self.config_file_check and dict_configopts == None:
+            print("[" + module_name + " Error] The config file or manual config is missing")
+            quit()
 
+        #Import our counter
+        
         """
         Distance
         <= 16
@@ -198,15 +207,15 @@ class contact_number:
                     continue
 
                 #<= 16
-                if len(dict_contact[self.report_chain][loc]) <= 16:
+                if dict_contact[self.report_chain][loc] <= 16:
                     list_16fewer.append(dict_classified[self.report_chain][loc][mut])
 
                 #17 to 24
-                if len(dict_contact[self.report_chain][loc]) >= 17 and len(dict_contact[self.report_chain][loc]) <= 24:
+                if dict_contact[self.report_chain][loc] >= 17 and dict_contact[self.report_chain][loc] <= 24:
                     list_17to24.append(dict_classified[loc][mut])
 
                 #>= 25
-                if len(dict_contact[self.report_chain][loc]) >= 25:
+                if dict_contact[self.report_chain][loc] >= 25:
                     list_25greater.append(dict_classified[loc][mut])
 
         #Count the lists
@@ -226,4 +235,4 @@ class contact_number:
    
 if __name__ == '__main__':
     #Remind the user that the classifier needs to be ran within the context of PACT
-    print("[Contact Number Error] This classifier needs to be ran within the context of PACT.")   
+    print("[" + module_name + " Error] This classifier needs to be ran within the context of PACT.")   

@@ -18,27 +18,37 @@
 
 """burial distance - calculate the burial distance of any atom"""
 
-from sys import version_info
+#Set the name of this module
+module_name = "Burial Distance"
 
 #Check to see if our version is supported
-req_version = (3,4)
-cur_version = version_info
-
-if cur_version < req_version:
-    print("[Burial Distance Error] Your Python interpreter is too old."
+from sys import version_info
+if version_info < (3,4):
+    print("[" + module_name + " Error] Your Python interpreter is too old."
           "Minimium version required is Python 3.4 (64 bit recommended).")
     quit()
 
 from configparser import NoOptionError
-from math import sqrt, pow, pi, cos, sin
+from math import sqrt, pi
 from random import random
-from pact.pact_common import pretty_counter_dicts, euc_dist
+
+try:
+    import numpy as np
+except ImportError:
+    print("[Error] Numpy is not installed and is required.")
+    quit()
+
+try:
+    from scipy.spatial.distance import cdist
+except ImportError:
+    print("[Error] SciPy is not installed and is required.")
+    quit()
 
 #Set the author information
 __author__ = "Justin R. Klesmith"
 __copyright__ = "Copyright 2018, Justin R. Klesmith"
 __license__ = "GPL-3.0"
-__version__ = "2018.6"
+__version__ = "2018.12"
 __maintainer__ = "Justin R. Klesmith"
 __email__ = ["jrk@umn.edu", "hackel@umn.edu"]
 
@@ -59,18 +69,71 @@ class burial_distance:
 
         #Get any config file entries
         if self.config_file.has_section("burial_distance"):
+
+            #Using config file
+            print("[Burial Distance] Using config file options")
+            self.config_file_check = False
+
             try:
-                #Classifier specific variables
+                #Set the pdb file name to look for in the pdb file dict
                 self.pdb_file = self.config_file.get('burial_distance', 'pdb_file')
-                self.config_chains = self.config_file.get('burial_distance', 'chains')
-                self.report_chain = self.config_file.get('burial_distance', 'report_chain')
-                self.num_points = int(self.config_file.get('burial_distance', 'points'))
+
+                #Select which chains to calculate for
+                self.chains = [chain.strip(' ') for chain in
+                               self.config_file.get('burial_distance', 'chains').upper().split(',')]
+
+                #Define the number of points to use
+                self.num_points = int(self.config_file.get('burial_distance', 'num_points'))
+
+                #Select the chain to count our classifiers on
+                self.classifer_chain = self.config_file.get('burial_distance', 'classifer_chain').upper()
+
             except NoOptionError:
-                print("[Burial Distance Error] the config file is missing any of the options: pdb_file, atoms, or chains.")
+                print("[Burial Distance Warning] The config file is missing some options")
         else:
-            print("[Burial Distance Error] the config file is missing the section [burial_distance]")
+            print("[Burial Distance] Not using config file options")
+            self.config_file_check = True
+        
+        return
+
+    def manual_config(self, dict_configopts):
+        """Set manual config options"""
+
+        #Set the pdb file name to look for in the pdb file dict
+        self.pdb_file = dict_configopts['pdb_file']
+
+        #Select which chains to calculate for
+        self.chains = [chain.strip(' ') for chain in dict_configopts['chains'].upper().split(',')]
+
+        #Define the number of points to use
+        self.num_points = int(dict_configopts['num_points'])
+
+        #Select the chain to count our classifiers on
+        self.classifer_chain = dict_configopts['classifier_chain'].upper()
 
         return
+
+    def atoms_dict_to_list(self, dict_pdb):
+        """Return a 2D list of all atoms and atom types"""
+
+        #Create a list of xyz coords that we want to match to (i.e. flatten the pdb dict)
+        list_atomtype = []
+        list_atoms = []
+
+        #Loop our chains
+        for chain in self.chains:
+
+            #The dict pdb[atom][chain][resi_num] is a list of dicts
+            #Only select the atoms and chains we actually want
+            for resi_num in dict_pdb[self.pdb_file]['dict_atom'][chain]:
+
+                #Loop the atoms
+                for atom in dict_pdb[self.pdb_file]['dict_atom'][chain][resi_num]:
+
+                    list_atoms.append([atom['x_coor'], atom['y_coor'], atom['z_coor']])
+                    list_atomtype.append(atom['atom_name'])
+
+        return list_atomtype, list_atoms
 
     def vdw_water_radius(self, atom):
         """Calculate the vdw+h2o radius"""
@@ -99,320 +162,201 @@ class burial_distance:
             #Default to the carbon radius given it's more likely
             return 1.548 + 1.4
 
-    def fibonacci_sphere(self, xatm, yatm, zatm, atom = ''):
+    def fibonacci_sphere(self, list_atoms, list_atomtype):
         """Use the Fibonacci sphere algorithm to make random points around a coordinate"""
 
-        #Get the radius
-        radius = self.vdw_water_radius(atom)
+        offset = 2/self.num_points
+        increment = pi * (3 - sqrt(5))
 
-        #Setup the variables
+        #Make a random seed
         rnd = random() * self.num_points
 
-        list_points = []
-        offset = 2./self.num_points
-        increment = pi * (3. - sqrt(5.));
+        #Preallocate a numpy array counting 0 to num_points in 1's (array of integers)
+        #for i in range(num_points):
+        nparr = np.arange(0, self.num_points)
 
-        #Loop and create the point
-        for i in range(self.num_points):
-            y = ((i * offset) - 1) + (offset / 2);
-            r = sqrt(1 - pow(y,2))
+        #   y = ((i * offset) - 1) + (offset / 2)
+        nparr_y = np.add(np.subtract(np.multiply(nparr, offset), 1), offset / 2)
 
-            phi = ((i + rnd) % self.num_points) * increment
+        #   r = sqrt(1 - pow(y,2))
+        nparr_r = np.sqrt(np.subtract(1, np.power(nparr_y,2)))
 
-            x = cos(phi) * r
-            z = sin(phi) * r
+        #   phi = ((i + rnd) % num_points) * increment
+        nparr_phi = np.multiply(np.mod(np.add(nparr, rnd), self.num_points), increment)
 
-            #Multiple the xyz by the wanted radius then add it to the atom coordinate
-            list_points.append([          
-                (x * radius) + xatm,
-                (y * radius) + yatm,
-                (z * radius) + zatm,
-                atom
-                ])
+        #   x = cos(phi) * r
+        nparr_x = np.multiply(np.cos(nparr_phi), nparr_r)
 
-        return list_points
+        #   z = sin(phi) * r
+        nparr_z = np.multiply(np.sin(nparr_phi), nparr_r)
 
-    def sphere_points(self, dict_pdb, file_pdb, list_chains):
-        """Calculate all of the points around the sidechains"""
 
-        #Compute a dict that has [[xyz], chain, loc]
-        #of 400 points of all sidechain residues CA to whatever
-        #Loop the chains that we want
-        print("[Burial Distance] Calculating the points around each atom.")
-        dict_points = {}
-        for chain in list_chains:
+        #Append our VDW+Water radius to a list (1D array) for each atom
+        list_vdwdist = np.array([self.vdw_water_radius(atom) for atom in list_atomtype])
 
-            #Add the chain
-            if chain not in dict_points:
-                dict_points[chain] = {}
 
-            #Loop the locations
-            for resi_num in dict_pdb[file_pdb]['dict_atom'][chain]:
+        #Multiply the XYZ points by the VDW+Water Radius after converting points from 1d to 2d
+        #Columns = Different Atoms, Rows = Points, shape = (n atoms, num_points)
+        nparr_xrad = np.multiply(nparr_x.reshape((nparr_x.shape[0], 1)), list_vdwdist)
+        nparr_yrad = np.multiply(nparr_y.reshape((nparr_y.shape[0], 1)), list_vdwdist)
+        nparr_zrad = np.multiply(nparr_z.reshape((nparr_z.shape[0], 1)), list_vdwdist)
 
-                #Add the residue
-                if resi_num not in dict_points[chain]:
-                    dict_points[chain][resi_num] = []
+        #Add the XYZ points by the original XYZ coords
+        #Columns = Different Atoms, Rows = Points, shape = (n atoms, num_points)
+        nparr_x_fibvdw = np.add(nparr_xrad, np.array(list_atoms).T[0])
+        nparr_y_fibvdw = np.add(nparr_yrad, np.array(list_atoms).T[1])
+        nparr_z_fibvdw = np.add(nparr_zrad, np.array(list_atoms).T[2])
 
-                #Loop the resi_nums
-                for atom in dict_pdb[file_pdb]['dict_atom'][chain][resi_num]:
+        return nparr_x_fibvdw, nparr_y_fibvdw, nparr_z_fibvdw, list_vdwdist
 
-                    #Assign our atom name to a temp var
-                    atom_name = atom['atom_name']
+    def surface_points(self, nparr_atomxyz, list_vdwdist, nparr_points):
+        """Return an array of surface xyz points"""
 
-                    #Check if our atom has a number in the first position use the rest
-                    if not atom_name[0].isalpha():
-                        atom_name = atom_name[1:]
+        #To save memory we will iterate through each atom position
+        #Essentially we will only calculate the distance for non-self positions
+        #X-axis is atom positions
+        #Y-axis is points
+        #Therefore, if our num_points = 100 and position = 1 then ignore column 1 rows 0 to 100
+        #Then, subtract the VDW+Water Dist and take np.amin(nparr, axis=1) along x
 
-                    #Append our list
-                    dict_points[chain][resi_num] += self.fibonacci_sphere(
-                        atom['x_coor'],
-                        atom['y_coor'],
-                        atom['z_coor'],
-                        atom_name                       
-                        )
+        #Make a list of the indicies of the aray using the size of nparr xyz
+        indices = np.arange(nparr_atomxyz.shape[0])
 
-        return dict_points
+        #Convert the VDW array from [....] to [[],[]] 1d to 2d (cannot slice as 1d)
+        nparr_vdw = list_vdwdist.reshape((list_vdwdist.shape[0], 1))
 
-    def nearest_neighbors(self, dict_pdb, file_pdb, list_chains):
-        """Return a dict of [chain][loc][[chain, loc],[]] of residues within 10A"""
-        
-        #Create a dict to work out of
-        list_coords = []
+        #Preallocate a numpy array to copy to
+        nparr_bool = np.empty(self.num_points * nparr_atomxyz.shape[0], dtype=bool)
 
-        #Loop the chains
-        for chain in list_chains:
+        #Calculate the Euc dist and row min excluding the atom column i and rows point i*num_points
+        #This is a slow function, the problem is that 1) cannot broadcast cdist at once
+        #or will get a memory error therefore you must window the analysis.
+        #The subtraction is also relys upon the index so chaining the index is critical.
+        #Expected time = 30sec for 30 points on ~ 6000 atoms
+        for i in range(0, nparr_atomxyz.shape[0]):
 
-            #Loop the locations
-            for resi_num in dict_pdb[file_pdb]['dict_atom'][chain]:
+            try:
+                #Calculate the Euclidean distance
+                nparr_eucdist = cdist(nparr_points[i * self.num_points : (i * self.num_points) + self.num_points], 
+                                      nparr_atomxyz[indices != i, :], metric='euclidean')
+            except MemoryError:
+                print("[PACT Error] Out of memory, try fewer points.")
+                quit()
 
-                #Loop the resi_nums
-                for atom in dict_pdb[file_pdb]['dict_atom'][chain][resi_num]:
+            #Subtract the VDW+Water distance
+            nparr_subdist = np.subtract(nparr_eucdist, nparr_vdw[indices != i, :].T)
 
-                    #Only look at Cb and HA1 for GLY
-                    if atom['atom_name'] != "CB" and atom['res_name'] != "GLY":
-                        continue
+            #Return true if point can not be overlapped
+            np.copyto(nparr_bool[i * self.num_points : (i * self.num_points) + self.num_points], np.all(nparr_subdist > 0, axis = 1))
 
-                    if atom['atom_name'] != "HA" and atom['res_name'] == "GLY":
-                        continue
+        #Return a mask of the original array 
+        return nparr_bool
 
-                    #Add the coords to the list
-                    list_coords.append([atom['x_coor'], atom['y_coor'], atom['z_coor'], chain, resi_num])
-
-        dict_nn = {}
-        #Loop the chains
-        for chain in list_chains:
-
-            #Add the chain
-            if chain not in dict_nn:
-                dict_nn[chain] = {}
-
-            #Loop the locations
-            for resi_num in dict_pdb[file_pdb]['dict_atom'][chain]:
-
-                #Add the residue
-                if resi_num not in dict_nn[chain]:
-                    dict_nn[chain][resi_num] = []
-
-                #Loop the resi_nums
-                for atom in dict_pdb[file_pdb]['dict_atom'][chain][resi_num]:
-
-                    #Only look at Cb and HA1 for GLY
-                    if atom['atom_name'] != "CB" and atom['res_name'] != "GLY":
-                        continue
-
-                    if atom['atom_name'] != "HA1" and atom['res_name'] == "GLY":
-                        continue
-
-                    #Loop and add residues under 10A
-                    for coords in list_coords:
-
-                        #Check if itself
-                        if coords[4] == resi_num:
-                            continue
-
-                        #Check dist
-                        dist = euc_dist(atom['x_coor'], coords[0],
-                                        atom['y_coor'], coords[1],
-                                        atom['z_coor'], coords[2])
-
-                        #Evaluate
-                        if dist < 10:
-                            dict_nn[chain][resi_num].append([coords[3], coords[4]])
-       
-        return dict_nn
-
-    def remove_nn(self, dict_pdb, file_pdb, dict_nn, dict_points):
-        """Remove overlapping near neighbors points"""
-
-        #Loop the chains
-        for chain in dict_points:
-
-            #Loop the residues locations
-            for resi_loc in dict_points[chain]:
-
-                print("Residue: " + str(resi_loc))
-
-                #Get the list of neighbors ["chain", resi_loc], [...
-                list_nn = dict_nn[chain][resi_loc]
-
-                #Loop the NN residues
-                for nn in range(0, len(list_nn)):
-
-                    #NN Chain
-                    nn_chain = list_nn[nn][0]
-
-                    #NN Location
-                    nn_location = list_nn[nn][1]
-
-                    #Get the neighbor points [[x,y,z,atom], [x..
-                    len_original_points = len(dict_points[nn_chain][nn_location])
-
-                    #Loop the original coors of the structure
-                    for atom in dict_pdb[file_pdb]['dict_atom'][chain][resi_loc]:
-
-                        #Create a list to append to
-                        list_points_to_save = []
-
-                        #Calculate the rvdw+rw dist
-                        radi_dist = self.vdw_water_radius(atom['atom_name'])
-
-                        #Evaluate the points
-                        for point in dict_points[nn_chain][nn_location]:
-
-                            #Calculate the distance from atom to nn point
-                            dist = euc_dist(
-                                point[0], atom['x_coor'],
-                                point[1], atom['y_coor'],
-                                point[2], atom['z_coor']
-                                )
-
-                            #Evaluate if we're overlapping, save if the distance is over
-                            if dist > radi_dist:
-                               list_points_to_save.append(point)
-                               
-                        #Overwrite the nn list
-                        dict_points[nn_chain][nn_location] = list_points_to_save
-
-        return dict_points
-
-    def remove_all_sites(self, dict_pdb, file_pdb, dict_points):
-        """Do a final pass to remove overlapping points"""
-
-        #Loop the chains
-        for chain in dict_points:
-
-            #Loop the residues locations
-            for resi_loc in dict_points[chain]:
-
-                print("Residue: " + str(resi_loc))
-
-                #Skip points with zero
-                if len(dict_points[chain][resi_loc]) == 0:
-                    print("Skipped as it is zero.")
-                    continue
-
-                #Loop the original coors of the structure
-                for atom in dict_pdb[file_pdb]['dict_atom'][chain][resi_loc]:
-
-                    #Calculate the rvdw+rw dist
-                    radi_dist = self.vdw_water_radius(atom['atom_name'])
-
-                    #Evaluate search chains
-                    for search_chain in dict_points:
-
-                        #Evaluate all locations
-                        for search_loc in dict_points[search_chain]:
-
-                            #Create a list to append to
-                            list_points_to_save = []
-
-                            #Evaluate the points
-                            for point in dict_points[search_chain][search_loc]:
-
-                                #Calculate the distance from atom to nn point
-                                dist = euc_dist(
-                                    point[0], atom['x_coor'],
-                                    point[1], atom['y_coor'],
-                                    point[2], atom['z_coor']
-                                    )
-
-
-                                #Evaluate if we're overlapping, save if the distance is over
-                                if dist > radi_dist:
-                                    list_points_to_save.append(point)
-                               
-                            #Overwrite the nn list
-                            dict_points[search_chain][search_loc] = list_points_to_save
-
-        return dict_points
-
-    def burial_distance(self, dict_pdb, key_pdb='', chain_include=''):
+    def burial_distance(self, dict_pdb, dict_configopts = None):
         """Calculate the contact number of a residue"""
 
-        #Use the config file or the function call
-        if len(chain_include) > 0:
-            list_chains = chain_include.upper().split(',')
-        else:
-            list_chains = self.config_chains.upper()
+        #Set manual config options
+        if dict_configopts != None:
+            self.manual_config(dict_configopts)
+        elif self.config_file_check and dict_configopts == None:
+            print("[" + module_name + " Error] The config file or manual config is missing")
+            quit()
 
-        if len(key_pdb) > 0:
-            pdb_filename = key_pdb
-        else:
-            pdb_filename = self.pdb_file
+        #Process the pdb dict to return a list of all atoms and atom types
+        print("[Burial Distance] Converting the input PDB")
+        list_atomtype, list_atoms = self.atoms_dict_to_list(dict_pdb)
 
+        #Convert the list_atoms to a np array
+        nparr_atomxyz = np.array(list_atoms)
 
-        from scipy.spatial.distance import cdist
-        from numpy import array, matrix
-
-
-        x = array([[1, 1, 1], [2, 2, 2], [3, 3, 3], [4, 4, 4], [5,5,5]])
-        y = array([[10, 10, 10], [20, 20, 20], [30, 30, 30], [40, 40, 40]])
-
-        dist = cdist(y, x, metric='euclidean')
-
-        print(dist)
-
-        #Subtract
-        z = matrix([[1], 
-                   [1], 
-                   [1],
-                   [1]])
-
-        print(z)
-
-        print(dist - z)
-
-
-        quit()
-
-        #Calculate the nearest neighbors
-        #Return a dict of [chain][loc] = [[chain, loc],[]] of residues within 10A
-        print("[Burial Distance] Calculating the nearest neighbors to CB or HB1 in 10A shell")
-        dict_nn = self.nearest_neighbors(dict_pdb, pdb_filename, list_chains)
-
-        #Calculate the sphere around sidechain carbons or hydrogens for gly
-        #[chain][resi_num] = [x,y,z,atom], [...
+        #Make a numpy matrix for points around all atoms
+        #Returns xyz arrays of cols = atoms and rows = points
         print("[Burial Distance] Fibonacci sphere points around all atoms")
-        dict_points = self.sphere_points(dict_pdb, pdb_filename, list_chains)
+        nparr_x_fibvdw, nparr_y_fibvdw, nparr_z_fibvdw, list_vdwdist = self.fibonacci_sphere(list_atoms, list_atomtype)
+        
+        #Convert the matrix into a 2D [x,y,z]
+        #Flatten the arrays to 1D using .ravel(), convert into an array, transpose
+        #Should be n rows by three columns
+        nparr_points = np.array([nparr_x_fibvdw.ravel(), nparr_y_fibvdw.ravel(), nparr_z_fibvdw.ravel()]).T
 
-        #Evaluate the neighbors and the points as a first pass
-        #[chain][resi_num] = [x,y,z,atom], [...
-        print("[Burial Distance] First pass: removing points that overlap nearest neighbors")
-        dict_nonn_points = self.remove_nn(dict_pdb, pdb_filename, dict_nn, dict_points)
+        #Calculate the Euclidean distance and return a mask for surface points
+        print("[Burial Distance] Euclidean distance between points and atoms")
+        nparr_surface_mask = self.surface_points(nparr_atomxyz, list_vdwdist, nparr_points)
+        nparr_surface_points = nparr_points[nparr_surface_mask]
 
-        #Perform a second pass and evaluate against all sites
-        print("[Burial Distance] Second pass: removing points that overlap all residues")
-        dict_all_points = self.remove_all_sites(dict_pdb, pdb_filename, dict_nonn_points)
+        print("[Burial Distance] Number of atoms: " + str(nparr_atomxyz.shape[0]))
+        print("[Burial Distance] Number of examined points: " + str(nparr_points.shape[0]))
+        print("[Burial Distance] Number of surface points: " + str(nparr_surface_points.shape[0]))
+        
 
-        #Output our surface residues
-        print("Surface Resis")
-        for chain in dict_all_points:
-            for resi_loc in dict_all_points[chain]:
-                print(str(resi_loc) + " " + str(len(dict_all_points[chain][resi_loc])))
+        #Calculate the fraction of points removed for mainchain and sidechain atoms
+        """
+        FUTURE: Calculate the fraction of points removed for mainchain and sidechain atoms
+        Do what DSSP does.
+        points existing / num total points for main or side chain atoms = asa
+        Use nparr_surface_mask
+        Since the below uses a dict and is not in order must create a new dict matching the input lists
+        Could help with setting distance to zero for surface residues instead of 0.0001 cutoff
+        """
+        
+        #Return a dict of [chain][location][sidechain/mainchain _ min/max/mean distance, surface?]
+        dict_bd = {}
 
-        return dict_all_points
+        #Loop the chains
+        for chain in self.chains:
+
+            #Add the chain to our new dict
+            if chain not in dict_bd:
+                dict_bd[chain] = {}
+
+            #Loop the residues
+            for resi_num in dict_pdb[self.pdb_file]['dict_atom'][chain]:
+
+                #Create two lists of mainchain and sidechain atoms
+                list_mainchain = []
+                list_sidechain = []
+
+                #Return the mainchain atoms
+                for atom in dict_pdb[self.pdb_file]['dict_atom'][chain][resi_num]:
+
+                    #Return the vdw+h2o radius
+                    vdw_radi = self.vdw_water_radius(atom['atom_name'])
+
+                    #Check for mainchain
+                    if atom['atom_name'] in ['N', 'CA', 'C', 'O', 'N', 'H']:
+                        list_mainchain.append(np.min(cdist(np.array([
+                            [atom['x_coor'], atom['y_coor'], atom['z_coor']]]), 
+                            nparr_surface_points, metric='euclidean') - vdw_radi))
+                    else:
+                        list_sidechain.append(np.min(cdist(np.array([
+                            [atom['x_coor'], atom['y_coor'], atom['z_coor']]]), 
+                            nparr_surface_points, metric='euclidean') - vdw_radi))
+
+                #Convert to array, negative values go to zero
+                nparr_mainchain = np.array(list_mainchain).clip(min=0)
+                nparr_sidechain = np.array(list_sidechain).clip(min=0)
+
+                #Calculate the euc dist and report
+                #If srfexp dist is < 0.0001 then classify as direct surface exposed
+                dict_bd[chain][resi_num] = {
+                    'main_min':np.min(nparr_mainchain),
+                    'main_mean':np.mean(nparr_mainchain),
+                    'main_max':np.max(nparr_mainchain),
+                    'side_min':np.min(nparr_sidechain),
+                    'side_mean':np.mean(nparr_sidechain),
+                    'side_max':np.max(nparr_sidechain),
+
+                    'main_min_surface':np.all(np.min(nparr_mainchain) < 0.0001),
+                    'main_mean_surface':np.all(np.mean(nparr_mainchain) < 0.0001),
+                    'main_max_surface':np.all(np.max(nparr_mainchain) < 0.0001),
+                    'side_min_surface':np.all(np.min(nparr_sidechain) < 0.0001),
+                    'side_mean_surface':np.all(np.mean(nparr_sidechain) < 0.0001),
+                    'side_max_surface':np.all(np.max(nparr_sidechain) < 0.0001),
+                    }
+
+        #Return dict, chain, loc
+        return dict_bd
 
 if __name__ == '__main__':
-
     #Remind the user that the classifier needs to be ran within the context of PACT
-    print("Burial Distance Error] This classifier needs to be ran within the context of PACT.")   
+    print("[" + module_name + " Error] This classifier needs to be ran within the context of PACT.")   
