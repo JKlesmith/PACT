@@ -292,14 +292,11 @@ class multiple_freq_mi:
                 #Get the site-wise frequency
                 site_freq = np.divide(counts, np.sum(counts))
 
-                #Append to a list
+                #Append to a #3D list 1D = everything, 2D = location, 3D = [mutation, freq]
                 list_single_freq.append(np.asarray((unique, site_freq)).T.tolist())
 
-            #Get the total number of reads
-            #dict_nparray_sel[design_key].shape[0]
-
             #Create a list of tuples (#, #) that have combinations of sites choose 2
-            list_sites = list(combinations(range(0, len(list_locations)), 2))            
+            list_sites = list(combinations(range(0, len(list_locations)), 2))
 
             #Return a 2D list
             list_combinations = []
@@ -311,35 +308,49 @@ class multiple_freq_mi:
                 nparr_single_freq1 = np.array(list_single_freq[mapping[0]])
                 nparr_single_freq2 = np.array(list_single_freq[mapping[1]])
 
-                #Return an array of the double variants
-                nparr_dbl_variants = np.asarray((dict_nparray_sel[design_key][mapping[0]], dict_nparray_sel[design_key][mapping[1]])).T
+                #Get the list of column variants from the dict
+                #Slice on all rows only return the column we want
+                #Reshape into a 2D list
+                nparr_col1 = dict_nparray_sel[design_key][:,mapping[0]].reshape((dict_nparray_sel[design_key].shape[0], 1))
+                nparr_col2 = dict_nparray_sel[design_key][:,mapping[1]].reshape((dict_nparray_sel[design_key].shape[0], 1))
 
-                #Mutation combination, combo = ['A', 'C']
-                for combo in nparr_dbl_variants: 
+                #Return an array of the double variants, transpose and slice to get 2d from 3d array
+                nparr_dbl_variants = np.asarray((nparr_col1, nparr_col2)).T[0]
 
-                    #Count the double variants (since the nparr_dbl_variants is a 2D we want to match to it)
-                    count_dbls = np.count_nonzero((nparr_dbl_variants == (combo[0], combo[1])).all(axis=1))
+                #Return the unique double pairings and the counts
+                nparr_dbl_combos, nparr_dbl_counts = np.unique(nparr_dbl_variants, axis=0, return_counts=True)
 
-                    #Find the single residue freqs
-                    freq1 = nparr_single_freq1[np.where(nparr_single_freq1[:,0] == combo[0])][0][1]
-                    freq2 = nparr_single_freq2[np.where(nparr_single_freq2[:,0] == combo[1])][0][1]
-                   
-                    #Append to our list
-                    #Site 0, site 1
-                    #Site 0 Letter, Site 1 Letter
-                    #Site 0 Freq, Site 1 Freq
-                    #Count, Total count
-                    list_combinations.append([mapping[0], mapping[1], combo[0], combo[1],
-                                        freq1, freq2, count_dbls, dict_nparray_sel[design_key].shape[0]])
-             
-            #Remove duplicates
-            idx, counts = np.unique(np.array(list_combinations), axis=0, return_counts=True)
+                #Create the single freq lists
+                #Replace with a numpy solution in the future
+                #https://stackoverflow.com/questions/29320873/replace-values-of-a-numpy-array-by-values-from-another-numpy-array
+                list_freq1 = []
+                list_freq2 = []
+                for combo in nparr_dbl_combos:
+                    list_freq1.append(nparr_single_freq1[np.where(nparr_single_freq2[:,0] == combo[0])][0][1])
+                    list_freq2.append(nparr_single_freq2[np.where(nparr_single_freq2[:,0] == combo[1])][0][1])
+
+                #Add to our lists
+                #Replace with a numpy solution in the future
+                for i in range(0, nparr_dbl_combos.shape[0]):
+                    list_combinations.append([
+                        mapping[0],
+                        mapping[1],
+                        nparr_dbl_combos[i][0],
+                        nparr_dbl_combos[i][1],
+                        list_freq1[i],
+                        list_freq2[i],
+                        nparr_dbl_counts.reshape((nparr_dbl_combos.shape[0], 1))[i][0],
+                        dict_nparray_sel[design_key].shape[0]
+                        ])
+
+            #Convert to numpy array
+            nparr_combinations = np.array(list_combinations)  
 
             #Extract the frequency and counts, reshape to 2D, and type
-            freq_one = np.asarray(idx.T[4].reshape((idx.shape[0], 1))).astype(float)
-            freq_two = np.asarray(idx.T[5].reshape((idx.shape[0], 1))).astype(float)
-            counts_doubles = np.asarray(idx.T[6].reshape((idx.shape[0], 1))).astype(int)
-            counts_total = np.asarray(idx.T[7].reshape((idx.shape[0], 1))).astype(int)
+            freq_one = np.asarray(nparr_combinations.T[4].reshape((nparr_combinations.shape[0], 1))).astype(float)
+            freq_two = np.asarray(nparr_combinations.T[5].reshape((nparr_combinations.shape[0], 1))).astype(float)
+            counts_doubles = np.asarray(nparr_combinations.T[6].reshape((nparr_combinations.shape[0], 1))).astype(int)
+            counts_total = np.asarray(nparr_combinations.T[7].reshape((nparr_combinations.shape[0], 1))).astype(int)
             
             #Calculate the frequency of the double variant
             frequency_doubles = np.divide(counts_doubles, counts_total)
@@ -354,21 +365,25 @@ class multiple_freq_mi:
 
             #Iterate each row of location combinations
             list_apc = []
-            for row in idx[:,0:2].tolist():
+            for row in nparr_combinations[:,0:2].tolist():
                 #Use isin twice, the first to see if the row is in the 2d array
                 #Then a second time to see if True is in the 2d array (the first
                 #will return a array of [True False] or other combo
-                nparr_mi_avg_idx = np.any(np.isin(idx[:,0:2], row), axis=1)
+                nparr_mi_avg_idx = np.any(np.isin(nparr_combinations[:,0:2], row), axis=1)
 
                 #Calculate the APC value
                 list_apc.append(np.divide(np.multiply(mi[nparr_mi_avg_idx].mean(), mi[nparr_mi_avg_idx].mean()), mi.mean()))
             
             #Calculate the MI-APC per site    
-            nparr_mi_apc = np.subtract(mi, np.array(list_apc).reshape((idx.shape[0], 1)))
+            nparr_mi_apc = np.subtract(mi, np.array(list_apc).reshape((nparr_combinations.shape[0], 1)))
            
-            print(idx)
-            print(nparr_mi_apc)
-
+            #Output a file
+            str_header = "Site1,Site2,Resi1,Resi2,Site1Freq,Site2Freq,Counts,TotalCounts,MI-APC"
+            str_filename = "_" + str(list_locations[0]) + "_" + str(list_locations[-1])
+            np.savetxt(self.out_prefix + str_filename + "_MI.csv", 
+                       np.hstack((nparr_combinations, nparr_mi_apc)), 
+                       fmt='%s,%s,%s,%s,%s,%s,%s,%s,%s', 
+                       header=str_header)
         return
 
     def output_heat(self, dict_sitewise):
@@ -474,7 +489,6 @@ class multiple_freq_mi:
         print(self.output_heat(dict_sitewise))
         self.output_tsv(dict_sitewise)
         print(save_pact_file(dict_sitewise, self.out_prefix + '_multiple_SSM'))
-
 
         #Calculate the mutual information (considering residues within groups)
         print("[Multiple Freq and MI] Mutual Information.")
