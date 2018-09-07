@@ -240,30 +240,30 @@ class structure_analysis:
                 
             """
             *****************************************
-            Interface Distance
+            Contact Map
             *****************************************
             """
             #Only import and run if selected
-            if self.dict_workflow['contact_map']:
+            #if self.dict_workflow['contact_map']:
 
                 #Check to see if the section is there
-                if not self.obj_cfgparser.has_section('contact_map'):           
-                    print("[Protocols:" + str_protocol_name + " Error] The contact_map config file is incorrect.")
-                    print("[Protocols:" + str_protocol_name + " Error] There is something wrong with the [contact_map] section.")
-                    quit()
+            #    if not self.obj_cfgparser.has_section('contact_map'):           
+            #        print("[Protocols:" + str_protocol_name + " Error] The contact_map config file is incorrect.")
+            #        print("[Protocols:" + str_protocol_name + " Error] There is something wrong with the [contact_map] section.")
+            #        quit()
 
                 #Import our class
-                try:
-                    from pact.analysis.structure.contact_map import contact_map
-                except ImportError:
+            #    try:
+            #        from pact.analysis.structure.contact_map import contact_map
+            #    except ImportError:
                     print("[Protocols:Enzyme Solubility] pact.analysis.structure.contact_map was not found.")
                     quit()
         
-                #Create our object
-                obj_contact_map = contact_map(self.obj_cfgparser, self.dict_programs, {})
+            #    #Create our object
+            #    obj_contact_map = contact_map(self.obj_cfgparser, self.dict_programs, {})
 
                 #Calculate the distance
-                dict_contact_map = obj_contact_map.contact_map(dict_pdb)
+            #    dict_contact_map = obj_contact_map.contact_map(dict_pdb)
 
             """
             *****************************************
@@ -271,26 +271,26 @@ class structure_analysis:
             *****************************************
             """
             #Only import and run if selected
-            if self.dict_workflow['hpatch_knn']:
+            #if self.dict_workflow['hpatch_knn']:
 
                 #Check to see if the section is there
-                if not self.obj_cfgparser.has_section('hpatch_knn'):           
-                    print("[Protocols:" + str_protocol_name + " Error] The hpatch_knn config file is incorrect.")
-                    print("[Protocols:" + str_protocol_name + " Error] There is something wrong with the [hpatch_knn] section.")
-                    quit()
+            #    if not self.obj_cfgparser.has_section('hpatch_knn'):           
+            #        print("[Protocols:" + str_protocol_name + " Error] The hpatch_knn config file is incorrect.")
+            #        print("[Protocols:" + str_protocol_name + " Error] There is something wrong with the [hpatch_knn] section.")
+            #        quit()
 
                 #Import our class
-                try:
-                    from pact.analysis.structure.hpatch_knn import hpatch_knn
-                except ImportError:
-                    print("[Protocols:Enzyme Solubility] pact.analysis.structure.hpatch_knn was not found.")
-                    quit()
+            #    try:
+            #        from pact.analysis.structure.hpatch_knn import hpatch_knn
+            #    except ImportError:
+            #        print("[Protocols:Enzyme Solubility] pact.analysis.structure.hpatch_knn was not found.")
+            #        quit()
         
                 #Create our object
-                obj_hpatchknn = hpatch_knn(self.obj_cfgparser, self.dict_programs, {})
+            #    obj_hpatchknn = hpatch_knn(self.obj_cfgparser, self.dict_programs, {})
 
                 #Calculate the distance
-                dict_hpatchknn = obj_hpatchknn.hpatch_knn(dict_pdb) 
+            #    dict_hpatchknn = obj_hpatchknn.hpatch_knn(dict_pdb) 
             """
             *****************************************
             Dataset Dump CSV
