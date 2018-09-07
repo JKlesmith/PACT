@@ -1,6 +1,5 @@
 # PACT - Protein Analysis and Classifier Toolkit<br />
 
-Each release will be archived into a year.month directory<br/>
 This software is released under GNU General Public License 3<br/>
 Additional license options available at http://license.umn.edu<br/>
 
