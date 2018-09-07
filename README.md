@@ -15,7 +15,7 @@ Example config files are stored in ./pact/tests/
 # Main Protocols:<br />
 back_to_consensus<br />
 classification_analysis<br />
-enzyme_filter<br />
+function_filter<br />
 fitness<br />
 pact_vs_pact<br />
 pact_vs_analysis<br />
