@@ -265,35 +265,29 @@ class multiple_freq_mi:
 
         return dict_sitewise
 
-    def mutual_information(self, nparray_seq, dict_nparray_ref, dict_nparray_sel):
+    def mutual_information(self, dict_nparray_sel):
         """Calculate the mutual information between residues"""
 
-        
+        #The input is a dict with the key of the sites and an array of sequences
+        #Programming note: nparr_filtered == dict_nparray_sel[design_key]
 
+        #Loop the designs, design_key = list of sites
+        for design_key in dict_nparray_sel:
 
-        #Loop the designs
-        for i in range(0, len(self.list_mutation_design)):
+            print("[Mutual Information] Mutual information for design group:")
+            print(design_key)
 
-            #Get the columns of chars that we want
-            nparr_cols = nparray_seq[:, self.list_mutation_design[i]]
-
-            #Join the chars to a string
-            nparr_col_strs = np.array(list(map(''.join, nparr_cols)))
-
-            #Remove string if not in design
-            nparr_filtered = nparr_col_strs[np.isin(nparr_col_strs, merged_letters[i])]
-
-            #Split the strings and transpose, return array of arrays of chars per site
-            nparr_col_strs = np.array([[char for char in str] for str in nparr_filtered]).T
+            #Locations (convert str to list)
+            list_locations = literal_eval(design_key)
 
             #Store a list of numpy arrays (index = site)(0 = letter, 1 = frequency)
             list_single_freq = []
 
             #Get the single residue freq
-            for j in range(0, len(self.list_mutation_design[i])):
+            for j in range(0, len(list_locations)):
             
                 #Count the unique aminos
-                unique, counts = np.unique(nparr_col_strs[j], return_counts=True)
+                unique, counts = np.unique(dict_nparray_sel[design_key].T[j], return_counts=True)
 
                 #Get the site-wise frequency
                 site_freq = np.divide(counts, np.sum(counts))
@@ -302,35 +296,41 @@ class multiple_freq_mi:
                 list_single_freq.append(np.asarray((unique, site_freq)).T.tolist())
 
             #Get the total number of reads
-            #nparr_filtered.shape[0]
+            #dict_nparray_sel[design_key].shape[0]
 
             #Create a list of tuples (#, #) that have combinations of sites choose 2
-            list_sites = list(combinations(range(0, len(self.list_mutation_design[i])), 2))            
+            list_sites = list(combinations(range(0, len(list_locations)), 2))            
 
-            #Create all possible mutation combinations
-            list_mutations = list(product(*list_single_freq))
-                           
             #Return a 2D list
             list_combinations = []
 
-            #Site locations
-            for mapping in list_sites: 
+            #Site locations, tuple = (0, 1)
+            for mapping in list_sites:
+
+                #Get the single mutation frequencies
+                nparr_single_freq1 = np.array(list_single_freq[mapping[0]])
+                nparr_single_freq2 = np.array(list_single_freq[mapping[1]])
 
                 #Return an array of the double variants
-                nparr_dbl_variants = np.asarray((nparr_col_strs[mapping[0]], nparr_col_strs[mapping[1]])).T
+                nparr_dbl_variants = np.asarray((dict_nparray_sel[design_key][mapping[0]], dict_nparray_sel[design_key][mapping[1]])).T
 
-                #Mutation combination
-                for combo in list_mutations: 
-                    
+                #Mutation combination, combo = ['A', 'C']
+                for combo in nparr_dbl_variants: 
+
                     #Count the double variants (since the nparr_dbl_variants is a 2D we want to match to it)
-                    count_dbls = np.count_nonzero((nparr_dbl_variants == (combo[mapping[0]][0], combo[mapping[1]][0])).all(axis=1))
+                    count_dbls = np.count_nonzero((nparr_dbl_variants == (combo[0], combo[1])).all(axis=1))
 
+                    #Find the single residue freqs
+                    freq1 = nparr_single_freq1[np.where(nparr_single_freq1[:,0] == combo[0])][0][1]
+                    freq2 = nparr_single_freq2[np.where(nparr_single_freq2[:,0] == combo[1])][0][1]
+                   
                     #Append to our list
-                    if count_dbls > 0:
-                        list_combinations.append([mapping[0], mapping[1], 
-                                          combo[mapping[0]][0], combo[mapping[1]][0],
-                                          combo[mapping[0]][1], combo[mapping[1]][1],
-                                          count_dbls, nparr_filtered.shape[0]])
+                    #Site 0, site 1
+                    #Site 0 Letter, Site 1 Letter
+                    #Site 0 Freq, Site 1 Freq
+                    #Count, Total count
+                    list_combinations.append([mapping[0], mapping[1], combo[0], combo[1],
+                                        freq1, freq2, count_dbls, dict_nparray_sel[design_key].shape[0]])
              
             #Remove duplicates
             idx, counts = np.unique(np.array(list_combinations), axis=0, return_counts=True)
@@ -365,8 +365,9 @@ class multiple_freq_mi:
             
             #Calculate the MI-APC per site    
             nparr_mi_apc = np.subtract(mi, np.array(list_apc).reshape((idx.shape[0], 1)))
-
-
+           
+            print(idx)
+            print(nparr_mi_apc)
 
         return
 
@@ -475,8 +476,9 @@ class multiple_freq_mi:
         print(save_pact_file(dict_sitewise, self.out_prefix + '_multiple_SSM'))
 
 
-        #Calculate the mutual information (considering residues within groups, between groups, and groups vs groups)
-        #self.mutual_information(dict_nparray_ref, dict_nparray_sel)
+        #Calculate the mutual information (considering residues within groups)
+        print("[Multiple Freq and MI] Mutual Information.")
+        self.mutual_information(dict_nparray_sel)
 
         #Print our output
         output_string = "Wrote per-residue CSV\n"
