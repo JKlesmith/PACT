@@ -31,7 +31,7 @@ if cur_version < req_version:
 
 from ast import literal_eval
 from configparser import NoOptionError
-from itertools import chain
+from itertools import chain, product, combinations, groupby
 import numpy as np
 from pact.pact_common import save_pact_file, open_pact_file
 
@@ -186,6 +186,8 @@ class multiple_freq_mi:
             list_sites = key.lstrip('[').rstrip(']').split(',')
 
             #Transpose the array (convert cols to rows)
+
+            ##FIX: Check if we want to keep tolist (converts numpy to list???)
             ref_transpose = np.array(dict_nparray_ref[key]).T.tolist()
             sel_transpose = np.array(dict_nparray_sel[key]).T.tolist()
 
@@ -263,8 +265,109 @@ class multiple_freq_mi:
 
         return dict_sitewise
 
-    def mutual_information(self, dict_nparray_ref, dict_nparray_sel):
+    def mutual_information(self, nparray_seq, dict_nparray_ref, dict_nparray_sel):
         """Calculate the mutual information between residues"""
+
+        
+
+
+        #Loop the designs
+        for i in range(0, len(self.list_mutation_design)):
+
+            #Get the columns of chars that we want
+            nparr_cols = nparray_seq[:, self.list_mutation_design[i]]
+
+            #Join the chars to a string
+            nparr_col_strs = np.array(list(map(''.join, nparr_cols)))
+
+            #Remove string if not in design
+            nparr_filtered = nparr_col_strs[np.isin(nparr_col_strs, merged_letters[i])]
+
+            #Split the strings and transpose, return array of arrays of chars per site
+            nparr_col_strs = np.array([[char for char in str] for str in nparr_filtered]).T
+
+            #Store a list of numpy arrays (index = site)(0 = letter, 1 = frequency)
+            list_single_freq = []
+
+            #Get the single residue freq
+            for j in range(0, len(self.list_mutation_design[i])):
+            
+                #Count the unique aminos
+                unique, counts = np.unique(nparr_col_strs[j], return_counts=True)
+
+                #Get the site-wise frequency
+                site_freq = np.divide(counts, np.sum(counts))
+
+                #Append to a list
+                list_single_freq.append(np.asarray((unique, site_freq)).T.tolist())
+
+            #Get the total number of reads
+            #nparr_filtered.shape[0]
+
+            #Create a list of tuples (#, #) that have combinations of sites choose 2
+            list_sites = list(combinations(range(0, len(self.list_mutation_design[i])), 2))            
+
+            #Create all possible mutation combinations
+            list_mutations = list(product(*list_single_freq))
+                           
+            #Return a 2D list
+            list_combinations = []
+
+            #Site locations
+            for mapping in list_sites: 
+
+                #Return an array of the double variants
+                nparr_dbl_variants = np.asarray((nparr_col_strs[mapping[0]], nparr_col_strs[mapping[1]])).T
+
+                #Mutation combination
+                for combo in list_mutations: 
+                    
+                    #Count the double variants (since the nparr_dbl_variants is a 2D we want to match to it)
+                    count_dbls = np.count_nonzero((nparr_dbl_variants == (combo[mapping[0]][0], combo[mapping[1]][0])).all(axis=1))
+
+                    #Append to our list
+                    if count_dbls > 0:
+                        list_combinations.append([mapping[0], mapping[1], 
+                                          combo[mapping[0]][0], combo[mapping[1]][0],
+                                          combo[mapping[0]][1], combo[mapping[1]][1],
+                                          count_dbls, nparr_filtered.shape[0]])
+             
+            #Remove duplicates
+            idx, counts = np.unique(np.array(list_combinations), axis=0, return_counts=True)
+
+            #Extract the frequency and counts, reshape to 2D, and type
+            freq_one = np.asarray(idx.T[4].reshape((idx.shape[0], 1))).astype(float)
+            freq_two = np.asarray(idx.T[5].reshape((idx.shape[0], 1))).astype(float)
+            counts_doubles = np.asarray(idx.T[6].reshape((idx.shape[0], 1))).astype(int)
+            counts_total = np.asarray(idx.T[7].reshape((idx.shape[0], 1))).astype(int)
+            
+            #Calculate the frequency of the double variant
+            frequency_doubles = np.divide(counts_doubles, counts_total)
+
+            #Calculate the MI
+            mi = np.log2(np.divide(frequency_doubles, np.multiply(freq_one, freq_two)))
+
+            #Calculate the APC (Average Product Correction) Dunn Bioinformatics
+            #APC = Avg MI of site n to all sites except to itself, Avg MI of site m to all except itself
+            #Divided by the mean MI of all sites (except sites to itself)
+            #Subtract this from the MI
+
+            #Iterate each row of location combinations
+            list_apc = []
+            for row in idx[:,0:2].tolist():
+                #Use isin twice, the first to see if the row is in the 2d array
+                #Then a second time to see if True is in the 2d array (the first
+                #will return a array of [True False] or other combo
+                nparr_mi_avg_idx = np.any(np.isin(idx[:,0:2], row), axis=1)
+
+                #Calculate the APC value
+                list_apc.append(np.divide(np.multiply(mi[nparr_mi_avg_idx].mean(), mi[nparr_mi_avg_idx].mean()), mi.mean()))
+            
+            #Calculate the MI-APC per site    
+            nparr_mi_apc = np.subtract(mi, np.array(list_apc).reshape((idx.shape[0], 1)))
+
+
+
         return
 
     def output_heat(self, dict_sitewise):
@@ -373,7 +476,7 @@ class multiple_freq_mi:
 
 
         #Calculate the mutual information (considering residues within groups, between groups, and groups vs groups)
-        self.mutual_information(dict_nparray_ref, dict_nparray_sel)
+        #self.mutual_information(dict_nparray_ref, dict_nparray_sel)
 
         #Print our output
         output_string = "Wrote per-residue CSV\n"
