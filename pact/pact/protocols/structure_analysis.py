@@ -136,26 +136,26 @@ class structure_analysis:
             *****************************************
             """
             #Only import and run if selected
-            #if self.dict_workflow['burial_distance']:
+            if self.dict_workflow['burial_distance']:
 
                 #Check to see if the section is there
-            #    if not self.obj_cfgparser.has_section('burial_distance'):           
-            #        print("[Protocols:" + str_protocol_name + " Error] The burial_distance config file is incorrect.")
-            #        print("[Protocols:" + str_protocol_name + " Error] There is something wrong with the [burial_distance] section.")
-            #        quit()
+                if not self.obj_cfgparser.has_section('burial_distance'):           
+                    print("[Protocols:" + str_protocol_name + " Error] The burial_distance config file is incorrect.")
+                    print("[Protocols:" + str_protocol_name + " Error] There is something wrong with the [burial_distance] section.")
+                    quit()
 
                 #Import our class
-            #    try:
-            #        from pact.analysis.structure.burial_distance import burial_distance
-            #    except ImportError:
-            #        print("[Protocols:Enzyme Solubility] pact.analysis.structure.burial_distance was not found.")
-            #        quit()
+                try:
+                    from pact.analysis.structure.burial_distance import burial_distance
+                except ImportError:
+                    print("[Protocols:Enzyme Solubility] pact.analysis.structure.burial_distance was not found.")
+                    quit()
         
                 #Create our object
-            #    obj_bd = burial_distance(self.obj_cfgparser, self.dict_programs, {})
+                obj_bd = burial_distance(self.obj_cfgparser, self.dict_programs, {})
 
                 #Calculate the distance
-            #    dict_bd = obj_bd.burial_distance(dict_pdb)
+                dict_bd = obj_bd.burial_distance(dict_pdb)
 
             """
             *****************************************
@@ -209,8 +209,88 @@ class structure_analysis:
                 obj_contact = contact_number(self.obj_cfgparser, self.dict_programs, {})
 
                 #Calculate the distance
-                dict_contact = obj_contact.contact_number(dict_pdb)           
+                dict_contact = obj_contact.contact_number(dict_pdb) 
+                
+            """
+            *****************************************
+            Interface Distance
+            *****************************************
+            """
+            #Only import and run if selected
+            if self.dict_workflow['interface_distance']:
 
+                #Check to see if the section is there
+                if not self.obj_cfgparser.has_section('interface_distance'):           
+                    print("[Protocols:" + str_protocol_name + " Error] The interface_distance config file is incorrect.")
+                    print("[Protocols:" + str_protocol_name + " Error] There is something wrong with the [interface_distance] section.")
+                    quit()
+
+                #Import our class
+                try:
+                    from pact.analysis.structure.interface_distance import interface_distance
+                except ImportError:
+                    print("[Protocols:Enzyme Solubility] pact.analysis.structure.interface_distance was not found.")
+                    quit()
+        
+                #Create our object
+                obj_int_dist = interface_distance(self.obj_cfgparser, self.dict_programs, {})
+
+                #Calculate the distance
+                dict_int_dist = obj_int_dist.interface_distance(dict_pdb)
+                
+            """
+            *****************************************
+            Interface Distance
+            *****************************************
+            """
+            #Only import and run if selected
+            if self.dict_workflow['contact_map']:
+
+                #Check to see if the section is there
+                if not self.obj_cfgparser.has_section('contact_map'):           
+                    print("[Protocols:" + str_protocol_name + " Error] The contact_map config file is incorrect.")
+                    print("[Protocols:" + str_protocol_name + " Error] There is something wrong with the [contact_map] section.")
+                    quit()
+
+                #Import our class
+                try:
+                    from pact.analysis.structure.contact_map import contact_map
+                except ImportError:
+                    print("[Protocols:Enzyme Solubility] pact.analysis.structure.contact_map was not found.")
+                    quit()
+        
+                #Create our object
+                obj_contact_map = contact_map(self.obj_cfgparser, self.dict_programs, {})
+
+                #Calculate the distance
+                dict_contact_map = obj_contact_map.contact_map(dict_pdb)
+
+            """
+            *****************************************
+            HPatch KNN
+            *****************************************
+            """
+            #Only import and run if selected
+            if self.dict_workflow['hpatch_knn']:
+
+                #Check to see if the section is there
+                if not self.obj_cfgparser.has_section('hpatch_knn'):           
+                    print("[Protocols:" + str_protocol_name + " Error] The hpatch_knn config file is incorrect.")
+                    print("[Protocols:" + str_protocol_name + " Error] There is something wrong with the [hpatch_knn] section.")
+                    quit()
+
+                #Import our class
+                try:
+                    from pact.analysis.structure.hpatch_knn import hpatch_knn
+                except ImportError:
+                    print("[Protocols:Enzyme Solubility] pact.analysis.structure.hpatch_knn was not found.")
+                    quit()
+        
+                #Create our object
+                obj_hpatchknn = hpatch_knn(self.obj_cfgparser, self.dict_programs, {})
+
+                #Calculate the distance
+                dict_hpatchknn = obj_hpatchknn.hpatch_knn(dict_pdb) 
             """
             *****************************************
             Dataset Dump CSV
@@ -235,7 +315,27 @@ class structure_analysis:
                 "fraction_burial",
                 "dist_to_active",
                 "contact_number",
-                #"burial_distance"
+                
+                "burial_dist_side_min",
+                "burial_dist_side_mean",
+                "burial_dist_side_max",
+                "burial_dist_main_min",
+                "burial_dist_main_mean",
+                "burial_dist_main_max",
+
+                "burial_dist_side_min_surf",
+                "burial_dist_side_mean_surf",
+                "burial_dist_side_max_surf",
+                "burial_dist_main_min_surf",
+                "burial_dist_main_mean_surf",
+                "burial_dist_main_max_surf",
+
+                "interf_dist_side_min",
+                "interf_dist_side_mean",
+                "interf_dist_side_max",
+                "interf_dist_main_min",
+                "interf_dist_main_mean",
+                "interf_dist_main_max",
                 ]) + "\n"
 
             #Loop the locations
@@ -252,21 +352,48 @@ class structure_analysis:
 
                 #Dist to active site
                 if self.dict_workflow['distance_to_active']:
-                    str_output = str_output + str(min(dict_dtoa_dist[chain][loc])) + ','
+                    str_output = str_output + str(dict_dtoa_dist[chain][loc]) + ','
                 else:
                     str_output = str_output + ','
                     
                 #Contact number
                 if self.dict_workflow['contact_number']:
-                    str_output = str_output + str(len(dict_contact[chain][loc])) + ','
+                    str_output = str_output + str(dict_contact[chain][loc]) + ','
                 else:
                     str_output = str_output + ','
 
                 #Burial Distance
-                #if self.dict_workflow['burial_distance']:
-                #    str_output = str_output + str(len(dict_bd[chain][loc])) + ','
-                #else:
-                #    str_output = str_output + ','
+                if self.dict_workflow['burial_distance']:
+                    str_output = str_output + ','.join(map(str, [
+                        dict_bd[chain][loc]['side_min'],                                   
+                        dict_bd[chain][loc]['side_mean'],
+                        dict_bd[chain][loc]['side_max'],
+                        dict_bd[chain][loc]['main_min'],
+                        dict_bd[chain][loc]['main_mean'],
+                        dict_bd[chain][loc]['main_max'],
+
+                        dict_bd[chain][loc]['side_min_surface'],
+                        dict_bd[chain][loc]['side_mean_surface'],
+                        dict_bd[chain][loc]['side_max_surface'],
+                        dict_bd[chain][loc]['main_min_surface'],
+                        dict_bd[chain][loc]['main_mean_surface'],
+                        dict_bd[chain][loc]['main_max_surface'],
+                        ])) + ','
+                else:
+                    str_output = str_output + ',,,,,,,,,,,,'
+
+                #Burial Distance
+                if self.dict_workflow['interface_distance']:
+                    str_output = str_output + ','.join(map(str, [
+                        dict_int_dist[chain][loc]['side_min'],                                   
+                        dict_int_dist[chain][loc]['side_mean'],
+                        dict_int_dist[chain][loc]['side_max'],
+                        dict_int_dist[chain][loc]['main_min'],
+                        dict_int_dist[chain][loc]['main_mean'],
+                        dict_int_dist[chain][loc]['main_max'],
+                        ])) + ','
+                else:
+                    str_output = str_output + ',,,,,,'
 
                 #Newline
                 str_output = str_output + '\n'            
