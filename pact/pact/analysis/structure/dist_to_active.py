@@ -18,26 +18,37 @@
 
 """dist_to_active - calculate the distance from any residue to a ligand in the structure"""
 
-from sys import version_info
+#Set the name of this module
+module_name = "Distance to Active Site"
 
 #Check to see if our version is supported
-req_version = (3,4)
-cur_version = version_info
-
-if cur_version < req_version:
-    print("[Distance to Active Site Error] Your Python interpreter is too old."
+from sys import version_info
+if version_info < (3,4):
+    print("[" + module_name + " Error] Your Python interpreter is too old."
           "Minimium version required is Python 3.4 (64 bit recommended).")
     quit()
 
+from collections import Counter
 from configparser import NoOptionError
-from math import sqrt, pow
-from pact.pact_common import pretty_counter_dicts, euc_dist
+from pact.pact_common import pretty_counter_dicts
+
+try:
+    import numpy as np
+except ImportError:
+    print("[Error] Numpy is not installed and is required.")
+    quit()
+
+try:
+    from scipy.spatial.distance import cdist
+except ImportError:
+    print("[Error] SciPy is not installed and is required.")
+    quit()
 
 #Set the author information
 __author__ = "Justin R. Klesmith"
 __copyright__ = "Copyright 2018, Justin R. Klesmith"
 __license__ = "GPL-3.0"
-__version__ = "2018.6"
+__version__ = "2018.12"
 __maintainer__ = "Justin R. Klesmith"
 __email__ = ["jrk@umn.edu", "hackel@umn.edu"]
 
@@ -58,76 +69,107 @@ class dist_to_active:
 
         #Get any config file entries
         if self.config_file.has_section("distance_to_active"):
+
+            #Using config file
+            print("[Distance to Active Site] Using config file options")
+            self.config_file_check = False
+
+            #Classifier specific variables
             try:
-                #Classifier specific variables
+                #Set the pdb file name to look for in the pdb file dict
                 self.pdb_file = self.config_file.get('distance_to_active', 'pdb_file')
-                self.config_atoms = self.config_file.get('distance_to_active', 'atoms')
-                self.config_chains = self.config_file.get('distance_to_active', 'chains')
-                self.report_chain = self.config_file.get('distance_to_active', 'report_chain')
-                self.config_ligands = self.config_file.get('distance_to_active', 'ligands')
-                self.config_activeresis = self.config_file.get('distance_to_active', 'active_residues')
-                self.config_ligandchains = self.config_file.get('distance_to_active', 'ligand_chains')
+
+                #Select which atoms to base our calculation off of
+                self.atoms = [atm.strip(' ') for atm in
+                             self.config_file.get('distance_to_active', 'atoms').upper().split(',')]
+
+                #Select which chains to calculate for
+                self.chains = [chain.strip(' ') for chain in
+                               self.config_file.get('distance_to_active', 'chains').upper().split(',')]
+
+                #Define which ligand type to calculate the distance to
+                self.active_type = self.config_file.get('distance_to_active', 'active_type').upper()
+
+                #Define which chain the active site residues or ligands are on
+                self.active_chains = self.config_file.get('distance_to_active', 
+                                                                'active_chains').upper().split(',')
+
+                #Define which ligands to calculate the distance to
+                self.active_ligands = [ligand.strip(' ') for ligand in
+                                       self.config_file.get('distance_to_active', 'active_ligands').upper().split(',')]
+
+                #Define which active site residues to calculate the distance to
+                self.active_resis = list(map(int, self.config_file.get('distance_to_active', 
+                                                                             'active_residues').upper().split(',')))
+
+                #Select the chain to count our classifiers on
+                self.classifer_chain = self.config_file.get('distance_to_active', 'classifer_chain').upper()
+
             except NoOptionError:
-                print("[Distance to Active Site Error] the config file is missing any of the options: pdb_file, atoms, chains, or ligands.")
+                print("[Distance to Active Site Warning] The config file is missing some options")
+
         else:
-            print("[Distance to Active Site Error] the config file is missing the section [distance_to_active]")
+            #Using config file
+            print("[Distance to Active Site] Not using config file options")
+            self.config_file_check = True
 
         return
 
-    def dta_dist(self, dict_pdb, key_pdb='', atom_include='', chain_include='', ligand_include='', ligand_chains='', active_residues=''):
-        """Calculates the Euclidean distance from each atom to hetatm"""
+    def manual_config(self, dict_configopts):
+        """Set manual config options"""
 
-        #Use the config file or the function call
-        if len(atom_include) > 0:
-            list_atoms = atom_include.upper().split(',')
-        else:
-            list_atoms = self.config_atoms.upper().split(',')
+        #Set the pdb file name to look for in the pdb file dict
+        self.pdb_file = dict_configopts['pdb_file']
 
-        if len(chain_include) > 0:
-            list_chains = chain_include.upper().split(',')
-        else:
-            list_chains = self.config_chains.upper().split(',')
+        #Select which atoms to base our calculation off of
+        self.atoms = [atm.strip(' ') for atm in dict_configopts['atoms'].upper().split(',')]
 
-        if len(ligand_include) > 0:
-            list_ligands = ligand_include.upper().split(',')
-        else:
-            list_ligands = self.config_ligands.upper().split(',')
+        #Select which chains to calculate for
+        self.chains = [chain.strip(' ') for chain in dict_configopts['chains'].upper().split(',')]
 
-        if len(active_residues) > 0:
-            list_residues = list(map(int, active_residues.upper().split(',')))
-        else:
-            if len(self.config_activeresis) > 0:
-                list_residues = list(map(int, self.config_activeresis.split(',')))
-            else:
-                list_residues = None
+        #Define which ligands to calculate the distance to
+        self.active_type = self.config_file.get('distance_to_active', 'active_type').upper()
 
-        if len(key_pdb) > 0:
-            pdb_filename = key_pdb
-        else:
-            pdb_filename = self.pdb_file
+        #Define which chain the active site residues or ligands are on
+        self.active_chains = [chain.strip(' ') for chain in dict_configopts['active_chains'].upper().split(',')]
 
-        if len(ligand_chains) > 0:
-            list_ligandchains = ligand_chains.upper().split(',')
-        else:
-            list_ligandchains = self.config_ligandchains.upper().split(',')
+        #Define which ligands to calculate the distance to
+        self.active_ligands = [ligands.strip(' ') for ligands in dict_configopts['active_ligands'].upper().split(',')]
+
+        #Define which active site residues to calculate the distance to
+        self.active_resis = list(map(int, dict_configopts['active_residues'].upper().split(',')))
+
+        #Select the chain to count our classifiers on
+        self.classifer_chain = dict_configopts['classifier_chain'].upper()
+
+        return
+
+    def active_coords(self, dict_pdb):
+        """Return a list of lists of xyz coords for active ligands or residues"""
 
         #Create a list of lists of hetatm x,y,z values (lists keep order)
         list_active_coord = []
 
         #The dict pdb[atom][resi_num] is a list of dicts
-        if len(list_ligands[0]) > 0:
+        if self.active_type == "LIGANDS":
+
             #Parse the hetatm chains
-            for ligand_chain in list_ligandchains:
+            for ligand_chain in self.active_chains:
+
+                #Check to see if the ligand chain is in the dict
+                if ligand_chain not in dict_pdb[self.pdb_file]['dict_hetatm']:
+                    print("[Distance to Active Error] Ligand is not in the pdb.")
+                    quit()
 
                 #Parse the hetatms resi_nums
-                for hetatm_num in dict_pdb[pdb_filename]['dict_hetatm'][ligand_chain]:
+                for hetatm_num in dict_pdb[self.pdb_file]['dict_hetatm'][ligand_chain]:
 
                     #Parse each atom
-                    for hetatm in dict_pdb[pdb_filename]['dict_hetatm'][ligand_chain][hetatm_num]:
+                    for hetatm in dict_pdb[self.pdb_file]['dict_hetatm'][ligand_chain][hetatm_num]:
 
                         #Skip ligands we do not want using the first entry
-                        if (hetatm['res_name'] not in list_ligands or
-                            hetatm['chain'] not in list_ligandchains):
+                        if (hetatm['res_name'] not in self.active_ligands or
+                            hetatm['chain'] not in self.active_chains):
                             continue
 
                         #Add the coords to the list
@@ -138,17 +180,17 @@ class dist_to_active:
                             ])
         else:
             #Parse the atom chains
-            for ligand_chain in list_ligandchains:
+            for ligand_chain in self.active_chains:
 
                 #Parse the hetatms resi_nums
-                for atom_num in dict_pdb[pdb_filename]['dict_atom'][ligand_chain]:
+                for atom_num in dict_pdb[self.pdb_file]['dict_atom'][ligand_chain]:
 
                     #Parse each atom
-                    for atm in dict_pdb[pdb_filename]['dict_atom'][ligand_chain][atom_num]:
+                    for atm in dict_pdb[self.pdb_file]['dict_atom'][ligand_chain][atom_num]:
 
                         #Skip ligands we do not want using the first entry
-                        if (atm['resi_num'] not in list_residues or
-                            atm['chain'] not in list_ligandchains):
+                        if (atm['resi_num'] not in self.active_resis or
+                            atm['chain'] not in self.active_chains):
                             continue
 
                         #Add the coords to the list
@@ -158,53 +200,55 @@ class dist_to_active:
                             atm['z_coor']
                             ])
 
+        return list_active_coord
+
+    def dta_dist(self, dict_pdb, dict_configopts = None):
+        """Calculates the Euclidean distance from each atom to hetatm"""
+
+        #Set manual config options
+        if dict_configopts != None:
+            self.manual_config(dict_configopts)
+
+        #Get the active ligands/resis coords
+        nparr_active_coord = np.array(self.active_coords(dict_pdb))
+
         #Create a dict to work into
         dict_dtoa_dist = {}
 
         #Parse the atm chains
-        for atm_chain in list_chains:
+        for atm_chain in self.chains:
 
             #Add the chain
             if atm_chain not in dict_dtoa_dist:
                 dict_dtoa_dist[atm_chain] = {}
 
             #Parse the residue numbers
-            for resi_num in dict_pdb[pdb_filename]['dict_atom'][atm_chain]:
-
-                #Add the residue to the dict
-                if resi_num not in dict_dtoa_dist[atm_chain]:
-                    dict_dtoa_dist[atm_chain][resi_num] = []
+            for resi_num in dict_pdb[self.pdb_file]['dict_atom'][atm_chain]:
 
                 #The dict pdb[atom][resi_num] is a list of dicts
-                #Let's make a new list with the Euclidean distance of the atoms from list atm to atms in list hetatm
-                for atom in dict_pdb[pdb_filename]['dict_atom'][atm_chain][resi_num]:
+                #Make a list of atom coords in our resi number
+                #Only keep atoms we want and chains we want
+                nparr_atm_coord = np.array([[atom['x_coor'], atom['y_coor'], atom['z_coor']]
+                                  for atom in dict_pdb[self.pdb_file]['dict_atom'][atm_chain][resi_num]
+                                  if atom['atom_name'] in self.atoms and
+                                  atom['chain'] in self.chains])
+                
+                #Calculate the euc dist and return the min per location
+                dict_dtoa_dist[atm_chain][resi_num] = float(np.min(cdist(
+                    nparr_atm_coord, nparr_active_coord, metric='euclidean')))
 
-                    #Skip atoms we do not want
-                    if atom['atom_name'] not in list_atoms:
-                        continue
-
-                    #Skip chains we do not want
-                    if atom['chain'] not in list_chains:
-                        continue
-
-                    #Loop each hetatm
-                    for hetatm in list_active_coord:
-               
-                        #Calculate the Euclidean distance
-                        dist = euc_dist(atom['x_coor'], hetatm[0],
-                                        atom['y_coor'], hetatm[1],
-                                        atom['z_coor'], hetatm[2])
-
-                        dict_dtoa_dist[atm_chain][resi_num].append(dist)
-
-        #Return a dict of {resi_num:[dist, dist, dist]...
+        #Return a dict of {chain:resi_num:min dist]
         return dict_dtoa_dist
 
-    def classified_count(self, dict_dtoa, dict_classified):
+    def classified_count(self, dict_dtoa, dict_classified, dict_configopts = None):
         """Count our classifiers"""
 
-        #Import our counter
-        from collections import Counter
+        #Set manual config options
+        if dict_configopts != None:
+            self.manual_config(dict_configopts)
+        elif self.config_file_check and dict_configopts == None:
+            print("[" + module_name + " Error] The config file or manual config is missing")
+            quit()       
 
         """
         Distance
@@ -231,23 +275,23 @@ class dist_to_active:
                     continue
 
                 #Skip residues without location data
-                if loc not in dict_dtoa[self.report_chain]:
+                if loc not in dict_dtoa[self.classifer_chain]:
                     continue
 
                 #< 10A
-                if min(dict_dtoa[self.report_chain][loc]) < 10:
+                if dict_dtoa[self.classifer_chain][loc] < 10:
                     list_10closer.append(dict_classified[loc][mut])
 
                 #>= 10 to 14.999A
-                if min(dict_dtoa[self.report_chain][loc]) >= 10 and min(dict_dtoa[self.report_chain][loc]) < 15:
+                if dict_dtoa[self.classifer_chain][loc] >= 10 and dict_dtoa[self.classifer_chain][loc] < 15:
                     list_10to14.append(dict_classified[loc][mut])
 
                 #>= 15 to 19.999A
-                if min(dict_dtoa[self.report_chain][loc]) >= 15 and min(dict_dtoa[self.report_chain][loc]) < 20:
+                if dict_dtoa[self.classifer_chain][loc] >= 15 and dict_dtoa[self.classifer_chain][loc] < 20:
                     list_15to19.append(dict_classified[loc][mut])
 
                 #>= 20A
-                if min(dict_dtoa[self.report_chain][loc]) >= 20:
+                if dict_dtoa[self.classifer_chain][loc] >= 20:
                     list_20further.append(dict_classified[loc][mut])
 
         #Count the lists
@@ -270,4 +314,4 @@ class dist_to_active:
 
 if __name__ == '__main__':
     #Remind the user that the classifier needs to be ran within the context of PACT
-    print("[Distance to Active Site Error] This classifier needs to be ran within the context of PACT.")   
+    print("[" + module_name + " Error] This classifier needs to be ran within the context of PACT.")   
