@@ -418,6 +418,23 @@ class fitness:
                 list_metric_12 = [self.fitness_metric_growth(esynon) for esynon in list_log2_12]
                 list_metric_30 = [self.fitness_metric_growth(esynon) for esynon in list_log2_30]
                 list_metric_50 = [self.fitness_metric_growth(esynon) for esynon in list_log2_50]
+                
+                #Check for NaN for really low values
+                if "NaN" in list_metric_all:
+                    print("[Fitness Warning] Ignoring extremely low fitness values for wild-type synonymous codons.")
+                    list_metric_all = [x for x in list_metric_all if x != "NaN"]
+
+                if "NaN" in list_metric_12:
+                    print("[Fitness Warning] Ignoring extremely low fitness values for wild-type synonymous codons.")
+                    list_metric_12 = [x for x in list_metric_12 if x != "NaN"]
+
+                if "NaN" in list_metric_30:
+                    print("[Fitness Warning] Ignoring extremely low fitness values for wild-type synonymous codons.")
+                    list_metric_30 = [x for x in list_metric_30 if x != "NaN"]
+
+                if "NaN" in list_metric_50:
+                    print("[Fitness Warning] Ignoring extremely low fitness values for wild-type synonymous codons.")
+                    list_metric_50 = [x for x in list_metric_50 if x != "NaN"]
 
             elif self.metric == "facs":
 
@@ -438,7 +455,7 @@ class fitness:
                 list_metric_12 = list_log2_12
                 list_metric_30 = list_log2_30
                 list_metric_50 = list_log2_50
-        except StatisticsError:
+        except:
             print("[Fitness] Can not calculate the wild-type synon enrichment standard deviation.")
 
         #Calculate the standard deviation of the data
