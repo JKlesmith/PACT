@@ -120,11 +120,11 @@ if __name__ == '__main__':
     with open(file_config[1]) as input_config:
         for line in input_config.readlines():
             #Get the pact config version
-            if line.startswith("pact_config_version: "):
+            if line.startswith("pact_config_version:"):
                 config_version = line.split(":")[1].lower().rstrip("\n\r ").lstrip(" ")
 
             #Get the protocol
-            if line.startswith("pact_protocol: "):
+            if line.startswith("pact_protocol:"):
                 protocol = line.split(":")[1].lower().rstrip("\n\r ").lstrip(" ")
 
     #Print the preamble    
