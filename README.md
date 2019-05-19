@@ -6,7 +6,13 @@ Additional license options available at http://license.umn.edu<br/>
 Contact: Justin R. Klesmith at: jrk [at] umn.edu<br/>
 # Citation:<br/>
 https://github.com/JKlesmith/PACT/<br/>
-Justin R. Klesmith and Benjamin J. Hackel, In Preparation.<br/>
+https://academic.oup.com/bioinformatics/advance-article/doi/10.1093/bioinformatics/bty1042/5258100<br/>
+https://doi.org/10.1093/bioinformatics/bty1042<br/>
+
+# Update: May 2019<br />
+Moving most of the core to Numpy/Scipy.<br/>
+Moving forward a new directory will be uploaded with scripts from associated papers that use PACT calculated data.<br/>
+Suggest using PACT for dataset generation then use Spyder for individual analyses.<br/>
 
 # Usage:<br />
 python pact.py -c ./path/to/config_file.ini<br/>
