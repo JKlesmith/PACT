@@ -3,7 +3,7 @@
 This software is released under GNU General Public License 3<br/>
 Additional license options available at http://license.umn.edu<br/>
 
-Contact: Justin R. Klesmith at: jrk [at] umn.edu<br/>
+Contact: Justin R. Klesmith through the issue tracker.<br/>
 # Citation:<br/>
 https://github.com/JKlesmith/PACT/<br/>
 https://academic.oup.com/bioinformatics/advance-article/doi/10.1093/bioinformatics/bty1042/5258100<br/>
