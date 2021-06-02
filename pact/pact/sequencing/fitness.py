@@ -593,12 +593,15 @@ class fitness:
                          enumerate(zip(adj_mutation, design_wt)) if first != second][0]
             
             #Mutations that have counts in both populations and above a thereshold
-            location = adj_location[0] + diff_loc + 1
+            #location = adj_location[0] + diff_loc + 1
+            # 2021.6 bug fix: get the location from the mutcodon list directly
+            location = self.list_mutation_design[0][diff_loc]
             mut_type = adj_mutation[diff_loc]
 
             dict_ssm[location][mut_type] = {
                 "location":location,
-                "wt_residue":self.wtaa[adj_location[0] + diff_loc],
+                #"wt_residue":self.wtaa[adj_location[0] + diff_loc],
+                "wt_residue":design_wt[diff_loc], # 2021.6 bug fix: define wt from the wt based on mutcodons
                 "mutation":mut_type,
                 "reference_counts":self.dict_accepted[mut_key]['ref_counts'],
                 "selected_counts":self.dict_accepted[mut_key]['sel_counts'],
