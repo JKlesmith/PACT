@@ -569,6 +569,12 @@ class fitness:
                             "welch_p_val":"NaN",
                             }
 
+        # 2021.6 bug fix: if user uses 'single' however they have missing residues by design
+        # the 2018.6 version uses the original wild-type sequence and not the design
+        # sequence leading to a key error on dict_ssm (as the sequence stored in 
+        # dict_accepted only lists the mutations modified)
+        design_wt = [self.wtaa[w-1] for w in self.list_mutation_design[0]]
+
         #Fill in our data from the self.dict_accepted dict
         for mut_key in self.dict_accepted:
             
@@ -579,9 +585,13 @@ class fitness:
 
             #Iterate from the first element to the last element (using the numbering from the dict)
             #Cast as a list with one number and then slice it [0], ==> Returns an integer
-            diff_loc = [i for i in range(0, len(adj_location))
-                        if adj_mutation[i] != self.wtaa[adj_location[0] + i]][0]           
+            #diff_loc = [i for i in range(0, len(adj_location))
+            #            if adj_mutation[i] != self.wtaa[adj_location[0] + i]][0]           
 
+            # 2021.6 bug fix: more robust method to identify the position of the modified residue
+            diff_loc = [index for index, (first, second) in 
+                         enumerate(zip(adj_mutation, design_wt)) if first != second][0]
+            
             #Mutations that have counts in both populations and above a thereshold
             location = adj_location[0] + diff_loc + 1
             mut_type = adj_mutation[diff_loc]
