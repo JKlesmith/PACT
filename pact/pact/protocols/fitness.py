@@ -409,6 +409,12 @@ class fitness:
             """
             if self.dict_workflow['enrichment']:
 
+                # do we consider rejected mutations (based on design) from the total count?
+                try:
+                    consider_rejected = self.obj_cfgparser.get('enrichment', 'consider_rejected')
+                except NoOptionError:
+                    consider_rejected = 'false'
+                    
                 try:
                     #Test if we have a special input file
                     if len(self.obj_cfgparser.get('enrichment', 'ref_count_wildtype')) > 0:
@@ -471,7 +477,7 @@ class fitness:
                     "Ref_Count_Threshold":self.obj_cfgparser.get('enrichment', 'ref_count_threshold'),
                     "Sel_Count_Threshold":self.obj_cfgparser.get('enrichment', 'sel_count_threshold'),
                     "Strict_Count_Threshold":self.obj_cfgparser.get('enrichment', 'strict_count_threshold'),
-                    "consider_rejected":self.obj_cfgparser.get('enrichment', 'consider_rejected'),
+                    "consider_rejected":consider_rejected,
                     }
                 except NoSectionError:
                     print("[Protocols:Fitness Error] The enrichment config file is incorrect.")
