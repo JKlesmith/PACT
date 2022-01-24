@@ -93,6 +93,21 @@ class enrichment:
         except:
             self.strict_threshold = False
 
+        #
+        # do we consider mutations rejected in our design yet pass
+        # our read count filters to be in the total library count value?
+        # 2022.1 - default is now false as theoretically a large amount
+        # of non-designed mutations could skew the dataset distribution
+        # in the non-normalized enrichments
+        #
+        try:
+            if settings_dict["consider_rejected"].lower() == "true":
+                self.consider_rejected = True
+            else:
+                self.consider_rejected = False
+        except:
+            self.consider_rejected = False
+            
         #Import the mutation design list
         self.list_mutation_design = []
         for group in literal_eval(settings_dict['mutcodons']):
@@ -372,9 +387,11 @@ class enrichment:
         list_nonsynon_cols = [0, 1, 3, 8] #List columns for nonsynon: [0:design = 0, 1:location = 1, 2:mutation = 3, 3:counts = 8]
         list_wildtype_cols = [0, 0, 0, 2] #List columns for wildtype: [0:design = 0, 1:location = 0, 2:mutation = 0, 3:counts = 2]
 
-        #Read in the counted mutation files
-        dict_reject_ref, list_reject_ref = self.count_importer(self.file_ref_count_rejected, list_rejected_cols)
-        dict_reject_sel, list_reject_sel = self.count_importer(self.file_sel_count_rejected, list_rejected_cols)
+        # Read in the counted mutation files
+        # 2022.1 update for rejected mutations
+        if self.consider_rejected:
+            dict_reject_ref, list_reject_ref = self.count_importer(self.file_ref_count_rejected, list_rejected_cols)
+            dict_reject_sel, list_reject_sel = self.count_importer(self.file_sel_count_rejected, list_rejected_cols)
         
         dict_wildtype_ref, list_wt_ref = self.count_importer(self.file_ref_count_wt, list_wildtype_cols)
         dict_wildtype_sel, list_wt_sel = self.count_importer(self.file_sel_count_wt, list_wildtype_cols)
@@ -382,17 +399,38 @@ class enrichment:
         dict_nonsynon_ref, list_nonsynon_ref = self.count_importer(self.file_ref_count, list_nonsynon_cols)
         dict_nonsynon_sel, list_nonsynon_sel = self.count_importer(self.file_sel_count, list_nonsynon_cols)
 
-        #Merge the rejected and nonsynon selections into one dict each
-        dict_reject, counts_rejected_ref, counts_rejected_sel = self.dict_merge_count(dict_reject_ref, dict_reject_sel)
+        # merge the rejected and nonsynon selections into one dict each
+        # 2022.1 update for rejected mutations
+        if self.consider_rejected:
+            dict_reject, counts_rejected_ref, counts_rejected_sel = self.dict_merge_count(dict_reject_ref, dict_reject_sel)
+        
         dict_nonsynon, counts_nonsynon_ref, counts_nonsynon_sel = self.dict_merge_count(dict_nonsynon_ref, dict_nonsynon_sel)
 
         #Count the wildtype
         counts_wildtype_ref = sum(dict_wildtype_ref[count][3] for count in dict_wildtype_ref)
         counts_wildtype_sel = sum(dict_wildtype_sel[count][3] for count in dict_wildtype_sel)
 
-        #Sum the counts
-        counts_reftotal = counts_rejected_ref + counts_wildtype_ref + counts_nonsynon_ref
-        counts_seltotal = counts_rejected_sel + counts_wildtype_sel + counts_nonsynon_sel
+        #
+        # 2022.1 update - updated handling of strict counts
+        # As read depth increases, the rejected counts could skew the non-normalized dataset
+        # Therefore, it is suggested to not consider and remove the rejected counts
+        # from the total read count, (to retain the old default set a value of True for consider_rejected
+        # in the [enrichment] config section
+        # 
+        if self.consider_rejected:
+            # sum the counts
+            counts_reftotal = counts_rejected_ref + counts_wildtype_ref + counts_nonsynon_ref
+            counts_seltotal = counts_rejected_sel + counts_wildtype_sel + counts_nonsynon_sel
+        else:
+            # default action
+            
+            # sum the counts without rejected mutations adding to the total read amount
+            counts_reftotal = counts_wildtype_ref + counts_nonsynon_ref
+            counts_seltotal = counts_wildtype_sel + counts_nonsynon_sel
+            
+            # set rejected counts to zero
+            counts_rejected_ref = 0
+            counts_rejected_sel = 0
 
         #Calculate the wild-type enrichment
         try:
@@ -417,8 +455,11 @@ class enrichment:
 
         #[0design, 1location, 2mutation, 3ref_counts, 4sel_counts, 5ref_adj_counts, 6sel_adj_counts]
 
-        #Calculate the fractions and log2 enrichment
-        dict_reject = self.fraction_log2(dict_reject, counts_reftotal, counts_seltotal)
+        # calculate the fractions and log2 enrichment
+        # 2022.1 update for rejected mutations
+        if self.consider_rejected:
+            dict_reject = self.fraction_log2(dict_reject, counts_reftotal, counts_seltotal)
+        
         dict_nonsynon = self.fraction_log2(dict_nonsynon, counts_reftotal, counts_seltotal)
 
         #0design, 1location, 2mutation, 3ref_counts, 4sel_counts, 5ref_adj_counts, 6sel_adj_counts
@@ -463,8 +504,10 @@ class enrichment:
         #Save our synonymous dict
         output_string = output_string + self.save_result_dict(dict_wtsynon_enrichment, "enrichment_wtsynon") + "\n"
 
-        #Save our rejected dict
-        output_string = output_string + self.save_result_dict(dict_reject, "enrichment_reject_nonsynon", True) + "\n"
+        # Save our rejected dict
+        # 2022.1 update for rejected mutations
+        if self.consider_rejected:
+            output_string = output_string + self.save_result_dict(dict_reject, "enrichment_reject_nonsynon", True) + "\n"
         
         #Save our accepted dict
         output_string = output_string + self.save_result_dict(dict_nonsynon, "enrichment_accept_nonsynon", True) + "\n"
