@@ -471,6 +471,7 @@ class fitness:
                     "Ref_Count_Threshold":self.obj_cfgparser.get('enrichment', 'ref_count_threshold'),
                     "Sel_Count_Threshold":self.obj_cfgparser.get('enrichment', 'sel_count_threshold'),
                     "Strict_Count_Threshold":self.obj_cfgparser.get('enrichment', 'strict_count_threshold'),
+                    "consider_rejected":self.obj_cfgparser.get('enrichment', 'consider_rejected'),
                     }
                 except NoSectionError:
                     print("[Protocols:Fitness Error] The enrichment config file is incorrect.")
