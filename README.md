@@ -13,10 +13,8 @@ Improved mutant function prediction via PACT: Protein Analysis and Classifier To
 Justin R Klesmith  Benjamin J Hackel<br/>
 Bioinformatics, bty1042<br/>
 
-# Update: May 2019<br />
-Moving most of the core to Numpy/Scipy.<br/>
-Moving forward a new directory will be uploaded with scripts from associated papers that use PACT calculated data.<br/>
-Suggest using PACT for dataset generation then use Spyder for individual analyses.<br/>
+# Update: 2022.1 - revision 1
+A key change in the enrichment calculation has been made. Previously during software development we decided that a mutation (while not in the library design) that passed the mutational count filter would be considered in the total count. It is theoretically possible that a poorly made DNA library leading to a lot of rejected mutations could skew the raw enrichments. However, this shouldn't be an issue as we typically use normalized fitness values. A sample from the CD19 epitope 3B10 dataset showed this to be the case (where the log2 enrichments showed minor differences in the fraction (yet regressed to 1 using a linear fit) but the normalized Z-score were exacty the same). Therefore, the new default action of the enrichment module is to not consider mutations not desiged in the library in the total count. If the old method is desired a line stating "consider_rejected: True" in the config file under the enrichment heading can be added.
 
 # Usage:<br />
 python pact.py -c ./path/to/config_file.ini<br/>
