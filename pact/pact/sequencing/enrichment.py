@@ -84,14 +84,23 @@ class enrichment:
             self.ref_count_threshold = 12
             self.sel_count_threshold = 12
 
-        #Do we enforce a strict count threshold?
+        # 
+        # do we enforce a strict count threshold?
+        # 2022.1 new modes added
+        # ref-only and sel-only to strictly enforce one or the other
+        #
         try:
-            if settings_dict["Strict_Count_Threshold"].lower() == "true":
-                self.strict_threshold = True
+            if (settings_dict["Strict_Count_Threshold"].lower() == "true" or
+            settings_dict["Strict_Count_Threshold"].lower() == "both"):
+                self.strict_threshold = 10
+            elif settings_dict["Strict_Count_Threshold"].lower() == "ref-only":
+                self.strict_threshold = 11            
+            elif settings_dict["Strict_Count_Threshold"].lower() == "sel-only":
+                self.strict_threshold = 12            
             else:
-                self.strict_threshold = False
+                self.strict_threshold = 20
         except:
-            self.strict_threshold = False
+            self.strict_threshold = 20
 
         #
         # do we consider mutations rejected in our design yet pass
@@ -244,53 +253,62 @@ class enrichment:
                 dict_reference[mut_key] = [dict_selected[mut_key][0], dict_selected[mut_key][1],
                                         dict_selected[mut_key][2], 0, dict_selected[mut_key][3]]
 
-        #Add in virtual counts (for when a variant fell out or blew up and it's partner doesn't exist)
         count_ref = 0
         count_sel = 0
         for mut_key in dict_reference:
-            #Handle if we are enforcing strict read counts
-            if self.strict_threshold:           
-                #Add in 0 if below our threshold
+            
+            #
+            # strict ref counting
+            # mode 10 = both and mode 11 = ref-only
+            #
+            if self.strict_threshold == 10 or self.strict_threshold == 11:
                 if dict_reference[mut_key][3] < self.ref_count_threshold:
+                    # 0 if the ref is below our threshold
                     dict_reference[mut_key].append(0)
-            
-                #Else add in the original value
                 else:
-                    dict_reference[mut_key].append(dict_reference[mut_key][3])
-
-          
-                #Add in 0 if both are below our threshold (column #6) 
+                    # else the original value
+                    dict_reference[mut_key].append(dict_reference[mut_key][3])            
+            
+            #
+            # strict sel counting
+            # mode 10 = both and mode 12 = sel-only
+            #            
+            if self.strict_threshold == 10 or self.strict_threshold == 12:
                 if dict_reference[mut_key][4] < self.sel_count_threshold:
+                    # 0 if the sel is below our threshold
                     dict_reference[mut_key].append(0)
-            
-                #Else add in the original value
                 else:
+                    # else the original value
                     dict_reference[mut_key].append(dict_reference[mut_key][4])
 
-            else:
-                #Add in 1 for the reference if the selected is above our threshold (column #5)
+            #
+            # ref counting with virtual counts
+            # mode 20 = false and mode 12 = sel-only
+            #
+            if self.strict_threshold == 20 or self.strict_threshold == 12:
                 if dict_reference[mut_key][4] >= self.sel_count_threshold and dict_reference[mut_key][3] == 0:
-                    dict_reference[mut_key].append(1)
-            
-                #Add in 0 if both are below our threshold
+                    # add in 1 for the reference if the selected is above our threshold (column #5)
+                    dict_reference[mut_key].append(1)            
                 elif dict_reference[mut_key][4] < self.sel_count_threshold and dict_reference[mut_key][3] < self.ref_count_threshold:
+                    # add in 0 if both are below our threshold
                     dict_reference[mut_key].append(0)
-            
-                #Else add in the original value
                 else:
-                    dict_reference[mut_key].append(dict_reference[mut_key][3])
+                    # else add in the original value
+                    dict_reference[mut_key].append(dict_reference[mut_key][3])                
 
-
-                #Add in 1 for the selected if the reference is above our threshold (column #6)
+            #
+            # sel counting with virtual counts
+            # mode 20 = false and mode 11 = ref-only
+            #
+            if self.strict_threshold == 20 or self.strict_threshold == 11:
                 if dict_reference[mut_key][3] >= self.ref_count_threshold and dict_reference[mut_key][4] == 0:
+                    # add in 1 for the selected if the reference is above our threshold (column #6)
                     dict_reference[mut_key].append(1)
-            
-                #Add in 0 if both are below our threshold
                 elif dict_reference[mut_key][4] < self.sel_count_threshold and dict_reference[mut_key][3] < self.ref_count_threshold:
+                    # add in 0 if both are below our threshold
                     dict_reference[mut_key].append(0)
-            
-                #Else add in the original value
                 else:
+                    # else add in the original value
                     dict_reference[mut_key].append(dict_reference[mut_key][4])
 
             #Get the total number of counts above a threshold
