@@ -320,7 +320,7 @@ class fitness:
                     if len(self.obj_cfgparser.get('filter_counter_ref', 'read_file')) > 0:
                         file_input_fastqread_ref = self.obj_cfgparser.get('filter_counter_ref', 'read_file')
                     else:
-                        if file_checker(self.directory + self.output_prefix + "_Ref_Read.fastq"):
+                        if file_checker(self.directory + self.output_prefix + "_Ref_Read.tsv"):
                             file_input_fastqread_ref = self.directory + self.output_prefix + "_Ref_Read.tsv"
 
                     dict_filtercounter_options_ref = {
@@ -364,7 +364,7 @@ class fitness:
                     if len(self.obj_cfgparser.get('filter_counter_sel', 'read_file')) > 0:
                         file_input_fastqread_sel = self.obj_cfgparser.get('filter_counter_sel', 'read_file')
                     else:
-                        if file_checker(self.directory + self.output_prefix + "_Sel_Read.fastq"):
+                        if file_checker(self.directory + self.output_prefix + "_Sel_Read.tsv"):
                             file_input_fastqread_sel = self.directory + self.output_prefix + "_Sel_Read.tsv"
 
                     dict_filtercounter_options_sel = {
